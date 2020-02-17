@@ -1,0 +1,51 @@
+language: haskell
+
+sudo: required
+
+service:
+  - docker
+
+dist: xenial
+
+git:
+  depth: false
+  quiet: true
+
+notifications:
+  email:
+    recipients:
+    - nicolas.gardes@epitech.eu
+    - andy.begin@epitech.eu
+    on_success: change
+    on_failure: always
+
+jobs:
+  include:
+    - stage: deploy
+      script:
+        - chmod +x ./ci/deploy.sh
+      deploy:
+        provider: script
+        script: bash ci/deploy.sh
+        on:
+          branch: master
+    
+    - stage: test
+      script:
+        - make test_run
+
+stages:
+  - name: deploy
+    if: branch = master
+
+addons:
+  apt:
+    packages:
+      - lib32stdc++6
+# install:
+#   - git clone https://github.com/flutter/flutter.git -b beta
+#   - ./flutter/bin/flutter doctor
+
+# cache:
+#   directories:
+#     - $HOME/.pub-cache
