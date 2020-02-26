@@ -32,7 +32,7 @@ jobs:
     
     - stage: test
       script:
-        - make test_run
+        - docker run -v $PWD:/app epitechcontent/epitest-docker bash -c "cd app && make tests_run_coverage"
 
 stages:
   - name: deploy
@@ -42,10 +42,4 @@ addons:
   apt:
     packages:
       - lib32stdc++6
-# install:
-#   - git clone https://github.com/flutter/flutter.git -b beta
-#   - ./flutter/bin/flutter doctor
 
-# cache:
-#   directories:
-#     - $HOME/.pub-cache
