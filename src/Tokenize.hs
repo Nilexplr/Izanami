@@ -21,7 +21,6 @@ data Op = Plus
         | Eq
         | Not
         | Dif
-        | Assign
         | Power
         deriving(Show, Eq)
 
@@ -36,7 +35,6 @@ drawOp Sup = ">"
 drawOp Eq = "=="
 drawOp Not = "!"
 drawOp Dif = "!="
-drawOp Assign = "="
 drawOp Power = "^"
 
 data ValueType  = ValueDouble Double
@@ -55,6 +53,7 @@ data Token = Word String
             | TokenType
             | TokenQuote
             | TokenSQuote
+            | TokenAssign
             deriving(Show, Eq)
 
 cleanString :: String -> String
@@ -119,5 +118,5 @@ stringToToken ('!':x)   | x == []       = error "Invalid not during Tokenization
 --
 stringToToken ('=':x)   | x == []       = error "Invalid assignation during Tokenization"
                         | head x == '=' = TokenOp Eq      : (stringToToken $ tail x)
-                        | otherwise     = TokenOp Assign  : stringToToken x
+                        | otherwise     = TokenAssign  : stringToToken x
 stringToToken _ = error "Invalid character"
