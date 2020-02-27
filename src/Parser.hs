@@ -65,13 +65,13 @@ parseValue (TokenOpen : xs)     = case parseExpr xs of
     Just (expr, (TokenClose : ys))  -> Just (expr, ys)
     Nothing                         -> error "Parse Value return nothing when token open is detected"
 
-parseValue (Word n:xs)  | n `elem` symbols  =   Just (Symbol n recursive, rest)
-                        | n == "'"          =   case parseValue xs of
-                            Just (expr, ys) ->  Just (Symbol n [expr], ys)
-                            _               ->  error "Parse error for quote'"
-                        | otherwise         =   Just (KeyWord n, xs)
-                where
-                    (recursive, rest) = parseExprs [] xs
+-- parseValue (Word n:xs)  | n `elem` symbols  =   Just (Symbol n recursive, rest)
+--                         | n == "'"          =   case parseValue xs of
+--                             Just (expr, ys) ->  Just (Symbol n [expr], ys)
+--                             _               ->  error "Parse error for quote'"
+--                         | otherwise         =   Just (KeyWord n, xs)
+--                 where
+--                     (recursive, rest) = parseExprs [] xs
 
 parseValue (TokenOpen : (TokenClose:xs))    = error "Invalid syntax"
 -- Error for parsing the value
