@@ -45,9 +45,9 @@ data Expr   = Var       String                          ExprType
             deriving (Show, Eq)
 
 setTypeExpr :: Expr -> ExprType -> Expr
-setTypeExpr (Var x type) typage = Var x typage  
-setTypeExpr (Var x type) typage = Var x typage  
-setTypeExpr (Var x type) typage = Var x typage  
+setTypeExpr (Var x _) typage = Var x typage  
+-- setTypeExpr (Val x _) typage = Val x typage  
+-- setTypeExpr (Var x _) typage = Var x typage  
 
 typeValueToExpr :: ValueType -> ExprType
 typeValueToExpr (ValueDouble x) = ExprDouble
@@ -77,10 +77,15 @@ parseValue (TokenOpen : (TokenClose:xs))    = error "Invalid syntax"
 -- Error for parsing the value
 parseValue x = error ("Token not recognize")
 
+-- parseUnOp :: Op -> Parser Expr
+-- parseUnOp op tokens = case parseExpr tokens of
+--     Just (x, toks)      -> Just (BinOp op previousExpr x None, toks)
+--     _                   -> Nothing
+
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
-    Just (x, toks@)
-    Just (x, toks)   -> Just (BinOp op previousExpr x None, toks)  
+    Just (x, toks)      -> Just (BinOp op previousExpr x None, toks)  
+    _                   -> Nothing
 
 parseExpr :: Parser Expr
 parseExpr token = case parseValue token of
@@ -100,7 +105,6 @@ parseExprs list tokens =
     Just (expr, toks@(TokenComa : xs))      -> parseExprs (list ++ [expr]) xs
     -- Error during the parsing    
     _                                       -> Nothing
-parseExprs _    _                           = error "Invalid syntax"
 
 
 {-
