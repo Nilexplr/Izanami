@@ -15,7 +15,7 @@ testToken = do
                                             , TokenOp Time
                                             , TokenOp Dif
                                             , TokenOp Eq
-                                            , TokenOp Assign
+                                            , TokenAssign
                                             , TokenOp Not                                            
                                             ])
     quickCheck(stringToToken "2"    == [Value (ValueInt 2)])
