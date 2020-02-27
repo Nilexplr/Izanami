@@ -16,6 +16,7 @@ import Data.String
 import qualified Data.Map as Map
 import qualified Data.Text.Lazy.IO as Text
 import Foreign.Ptr
+import qualified LLVM.AST as AST
 import LLVM.AST.AddrSpace
 import LLVM.AST.Constant
 import LLVM.AST.Float
@@ -34,8 +35,25 @@ import System.IO
 import System.IO.Error
 import Text.Read (readMaybe)
 
+import qualified LLVM.ExecutionEngine as EE
 
-foreign import ccall "dynamic" mkFun :: FunPtr (IO Double) -> IO Double
+-- foreign import ccall "dynamic" mkFun :: FunPtr (IO Double) -> IO Double
+
+import Data.Int
+import Data.Word
+import Foreign.Ptr ( FunPtr, castFunPtr )
+
+import Control.Monad.Trans
+import System.Console.Haskeline
+import Control.Monad.Except
+import LLVM.Target
+import LLVM.Context
+import LLVM.CodeModel
+import LLVM.Module as Mod
+
+import LLVM.PassManager
+import LLVM.Transforms
+import LLVM.Analysis
 
 data JITEnv = JITEnv
   { jitEnvContext :: Context
@@ -43,6 +61,8 @@ data JITEnv = JITEnv
   , jitEnvModuleKey :: ModuleKey
   }
 
+foreign import ccall "dynamic" mkFun :: FunPtr (IO Double) -> IO Double
+ 
 test :: IO ()
 test = do
   withContext $ \ctx -> withHostTargetMachine $ \tm -> do
@@ -60,33 +80,33 @@ symResolver sym = undefined
 
 repl :: ModuleBuilderT (ReaderT JITEnv IO) ()
 repl = do
-    liftIO $ hPutStr stderr "ready> "
-    mline <- liftIO $ catchIOError (Just <$> getLine) eofHandler
-    case mline of
-        Nothing -> return ()
-        Just l -> do
-            ast <- parseExprs $ stringToToken l
-            anon <- isAnonExpr <$> hoist (buildAST ast)
-            def <- mostRecentDef
-            ctx <- lift $ asks jitEnvContext
-            env <- lift ask
-            liftIO $ withModuleFromAST ctx ast $ \mdl -> do
-                Text.hPutStrLn stderr $ ppll def
-                let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
-                -- this returns true if the module was modified
-                withPassManager spec $ flip runPassManager mdl
-                when anon (jit env mdl >>= hPrint stderr)
-            when anon (removeDef def)
-        --   case readMaybe l of
-        --     Nothing ->  liftIO $ hPutStrLn stderr "Couldn't parse"
-        --     Just ast -> do
-            repl
-    where
-        eofHandler e
-            | isEOFError e = return Nothing
-            | otherwise = ioError e
-        isAnonExpr (ConstantOperand (GlobalReference _ "__anon_expr")) = True
-        isAnonExpr _ = False
+  liftIO $ hPutStr stderr "ready> "
+  mline <- liftIO $ catchIOError (Just <$> getLine) eofHandler
+  case mline of
+    Nothing -> return ()
+    Just l -> do
+      liftIO $ print $ parseExprs $ stringToToken l
+      anon <- isAnonExpr <$> hoist (fromASTToLLVM $ parseExprs $ stringToToken l)
+      def <- mostRecentDef
+      
+      ast <- moduleSoFar "main"
+      ctx <- lift $ asks jitEnvContext
+      env <- lift ask
+      liftIO $ withModuleFromAST ctx ast $ \mdl -> do
+        Text.hPutStrLn stderr $ ppll def
+        let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
+        -- this returns true if the module was modified
+        withPassManager spec $ flip runPassManager mdl
+        when anon (jit env mdl >>= hPrint stderr)
+
+      when anon (removeDef def)
+      repl
+  where
+    eofHandler e
+      | isEOFError e = return Nothing
+      | otherwise = ioError e
+    isAnonExpr (ConstantOperand (GlobalReference _ "__anon_expr")) = True
+    isAnonExpr _ = False
 
 jit :: JITEnv -> Module -> IO Double
 jit JITEnv{jitEnvCompileLayer=compLayer, jitEnvModuleKey=mdlKey} mdl =
@@ -97,7 +117,7 @@ jit JITEnv{jitEnvCompileLayer=compLayer, jitEnvModuleKey=mdlKey} mdl =
 
 type Binds = Map.Map String Operand
 
-buildAST :: Expr -> ModuleBuilder Operand
+fromASTToLLVM :: Expr -> ModuleBuilder Operand
 -- buildAST (Function (Prototype nameStr paramStrs) body) = do
 --   let n = fromString nameStr
 --   function n params Type.double $ \ops -> do
@@ -107,13 +127,17 @@ buildAST :: Expr -> ModuleBuilder Operand
 
 -- buildAST (Extern (Prototype nameStr params)) =
 --   extern (fromString nameStr) (replicate (length params) Type.double) Type.double
-buildAST (Start x) = function "__anon_expr" [] Type.double $
-  const $ flip runReaderT mempty $ buildExprs x >>= ret
+fromASTToLLVM x = function "__anon_expr" [] Type.double $
+  const $ flip runReaderT mempty $ fromExprsToLLVM [x] >>= ret
 
-buildExprs :: [Expr] -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
-buildExprs ((Val (TInt x)):xs) = pure $ ConstantOperand (Float (Double (fromIntegral x)))
-buildExprs ((BinOp op xp1 xp2):xs) = do
-    op1 <- buildExprs [xp1]
-    op2 <- buildExprs [xp1]
-    tmp <- fadd op1 op2
+fromExprsToLLVM :: [Expr] -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromExprsToLLVM ((Val (TInt x)):xs) = pure $ ConstantOperand (Float (Double (fromIntegral x)))
+fromExprsToLLVM ((BinOp op xp1 xp2):xs) = do
+    op1 <- fromExprsToLLVM [xp1]
+    op2 <- fromExprsToLLVM [xp2]
+    tmp <- instr op1 op2
     return tmp
+      where
+        instr = case op of
+          Plus -> fadd
+          Minus -> fsub

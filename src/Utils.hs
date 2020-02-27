@@ -11,6 +11,13 @@ import LLVM.AST
 import LLVM.IRBuilder.Module
 import LLVM.IRBuilder.Internal.SnocList
 
+-- import LLVM.PassManager
+-- import LLVM.Transforms
+-- import LLVM.Analysis
+
+-- passes :: PassSetSpec
+-- passes = defaultCuratedPassSetSpec { optLevel = Just 3 }
+
 moduleSoFar :: MonadModuleBuilder m => ShortByteString -> m Module
 moduleSoFar nm = do
   s <- liftModuleState get
