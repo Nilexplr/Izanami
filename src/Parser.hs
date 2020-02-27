@@ -1,23 +1,15 @@
 module Parser 
     ( Expr(..)
-    , TType(..)
+    , ValueType(..)
     , parseExprs
+    , ExprType(..)
     )
     where
 
 import Tokenize
-import Utils
-import Control.Monad.IO.Class
-import qualified Data.Text.Lazy.IO as Text
-import LLVM.AST.Constant
-import LLVM.AST.Float
-import LLVM.AST.FloatingPointPredicate hiding (False, True)
-import LLVM.AST.Operand
-import LLVM.AST.Type as Type
-import LLVM.IRBuilder
+import Data.Data
 
 type Parser a = [Token] -> Maybe(a, [Token])
-
 
 symbols =   [ "def"
             , "extern"
@@ -31,30 +23,41 @@ symbols =   [ "def"
             , "var"
             ]
 
-
-data TType = TDouble Double
-            | TInt Int
-            | TString String
-            | TChar Char
+data ExprType   = ExprDouble 
+                | ExprInt 
+                | ExprString 
+                | ExprChar
+                | None
+                deriving (Eq, Show, Typeable)
+           
+            
+data Expr   = Var       String                  ExprType
+            | Val       ValueType               ExprType
+            | UnaryOp   Op      Expr            ExprType
+            | Call      String  [Expr]          ExprType
+            | Extern    String  [Expr]          ExprType
+            | Function  String  [Expr]  Expr    ExprType
+            | BinOp     Op      Expr    Expr    ExprType
+            | If        Expr    Expr    Expr    ExprType
+            | For       Expr    Expr    Expr    ExprType
+            | List      [Expr]                  ExprType
+            | AST       [Expr]                  ExprType
             deriving (Show, Eq)
 
-data Expr = Var String
-            | Val TType
-            | Function String [Expr] Expr
-            | BinOp Op Expr Expr
-            | Call String [Expr]
-            | Extern String [Expr]
-            | List [Expr]
-            | Start [Expr]
-            deriving (Show, Eq)
+type TypedExpr = (ExprType , Expr)
+
+typeValueToExpr :: ValueType -> ExprType
+typeValueToExpr ValueDouble x = ExprDouble
+typeValueToExpr ValueString x = ExprString
+typeValueToExpr ValueChar   x = ExprChar
+typeValueToExpr ValueInt    x = ExprInt
 
 {-
 Parse an expresion value
 -}
 parseValue :: Parser Expr
-parseValue (Number n:xs)                    = Just ((Val (TInt n)), xs)
-
--- parseValue (TokenOpen : xs)                 = case parseValue xs of
+parseValue (Value x:xs)         = Just ((Val x (typeValuetoExpr x)), xs)
+parseValue (TokenOpen : xs)     = case parseValue xs of
 --     Just (Val n, (TokenClose : ys))  -> Just (List [Val n], ys)
 --     Just (KeyWord n, (TokenClose : ys))  -> Just (List [KeyWord n], ys)
 --     Just (expr, (TokenClose : ys))  -> Just (expr, ys)
@@ -78,20 +81,16 @@ parseValue x = error ("Token not recognize")
 {-
 Parse several expressions
 -}
--- parseExprs :: [Expr] -> [Token] -> ([Expr], [Token])
-parseExprs :: [Token] -> Expr
-parseExprs ((Number n):(TokenOp op:xs))     = BinOp op (Val (TInt n)) $ parseExprs xs
-parseExprs ((Number n):(TokenComa:[]))      = Val (TInt n)
-parseExprs ((Word name):(TokenOp op:xs))    | op == Assign = BinOp Assign (Var name) $ parseExprs xs
+parseExprs :: [Expr] -> Parser [Expr]
+
 parseExprs _                                = error "Invalid syntax"
 
--- parseExprs _ -> error "Invalid"
 
 {-
 Launch the expression's parsing instance
 -}
--- parseExpr :: [Token] -> [Expr]
--- parseExpr [] = []
--- parseExpr tokens = case parseExprs [] tokens of
---     (result, [])    -> result
---     _               -> error "bad parsing"
+parseExpr :: [Token] -> Expr
+parseExpr [] = AST [] None
+parseExpr tokens = case parseExprs [] tokens of
+    Just (result, [])   -> AST result None
+    _                   -> error "bad parsing"

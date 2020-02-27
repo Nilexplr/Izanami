@@ -5,6 +5,7 @@ module Tokenize
     , Op(..)
     , drawOp
     , Token(..)
+    , ValueType(..)
     )
     where
 
@@ -21,6 +22,7 @@ data Op = Plus
         | Not
         | Dif
         | Assign
+        | Power
         deriving(Show, Eq)
 
 drawOp :: Op -> String
@@ -35,14 +37,24 @@ drawOp Eq = "=="
 drawOp Not = "!"
 drawOp Dif = "!="
 drawOp Assign = "="
+drawOp Power = "^"
 
+data ValueType  = ValueDouble Double
+                | ValueInt Int
+                | ValueString String
+                | ValueChar Char
+                deriving (Show, Eq)
+ 
 data Token = Word String
-            | Number Int
+            | Value ValueType
             | TokenOpen
             | TokenClose
             | TokenOp Op
             | TokenComa
             | TokenSep
+            | TokenType
+            | TokenQuote
+            | TokenSQuote
             deriving(Show, Eq)
 
 cleanString :: String -> String
@@ -57,12 +69,23 @@ cleanString (x:xs) = x : cleanString xs
 
 isSpeSpace :: Char -> Bool
 isSpeSpace ')' = True
-isSpeSpace '\'' = True
 isSpeSpace x = isSpace x 
+
+isFloat :: Char -> Bool
+isFloat '.' = True
+isFloat x = isDigit x
+
+isEndString :: Char -> Bool
+isEndString '"' = False
+isEndString x   = True
 
 reverseList :: [a] -> [a]
 reverseList [] = []
 reverseList (x:xs) = reverseList xs ++ [x]
+
+readNumber :: String -> ValueType
+readNumber x    | '.' `elem` x  = ValueDouble (read x :: Double)
+                | otherwise     = ValueInt (read x :: Int)
 
 stringToToken :: String -> [Token]
 stringToToken [] = []
@@ -74,23 +97,27 @@ stringToToken s@(x:xs)  | x == '(' = TokenOpen                  : stringToToken 
                         | x == '<' = TokenOp Inf                : stringToToken xs
                         | x == '>' = TokenOp Sup                : stringToToken xs
                         | x == '/' = TokenOp Div                : stringToToken xs
+                        | x == '^' = TokenOp Power              : stringToToken xs
                         | x == ';' = TokenComa                  : stringToToken xs
+                        | x == '\''= Value (ValueChar (head xs)) : stringToToken (tail (tail xs))
                         | x == ',' = TokenSep                   : stringToToken xs
-                        | isAlpha x = isOp word                 : stringToToken restchar
+                        | isAlpha x = Word word                 : stringToToken restchar
                         | isSpace x = stringToToken xs
                         | x == '\n' = stringToToken xs
-                        | isDigit x = Number (read num :: Int) : stringToToken restnum
+                        | isDigit x = Value (readNumber num)   : stringToToken restnum
                             where
-                                (word, restchar) = break isSpeSpace s
-                                (num, restnum) = break (not . isDigit) s
-                                isOp :: String -> Token
-                                isOp "div" = TokenOp Div
-                                isOp "mod" = TokenOp Mod
-                                isOp w = Word w
+                                (word, restchar)     = break isSpeSpace s
+                                (num, restnum)       = break (not . isFloat) s
 --
-stringToToken ("!":x)   | head x == "=" = TokenOp Dif       : stringToToken tail x
+stringToToken ('"':x) = Value (ValueString string)   : stringToToken (tail reststring)
+                            where
+                                (string, reststring) = break (not . isEndString) x
+--
+stringToToken ('!':x)   | x == []       = error "Invalid not during Tokenization"
+                        | head x == '=' = TokenOp Dif       : (stringToToken $ tail x)
                         | otherwise     = TokenOp Not       : stringToToken x
 --
-stringToToken ("=":x)   | head x == "=" = TokenOp Eq      : stringToToken tail x
+stringToToken ('=':x)   | x == []       = error "Invalid assignation during Tokenization"
+                        | head x == '=' = TokenOp Eq      : (stringToToken $ tail x)
                         | otherwise     = TokenOp Assign  : stringToToken x
 stringToToken _ = error "Invalid character"

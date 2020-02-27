@@ -1,4 +1,0 @@
-def  test(x : double):double x - 1.0;
-y = 2.0;
-while y < 10 do y = y * 2;
-test(y + 3.0);
