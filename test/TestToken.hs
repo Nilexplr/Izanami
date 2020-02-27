@@ -18,7 +18,9 @@ testToken = do
                                             , TokenOp Assign
                                             , TokenOp Not                                            
                                             ])
-    quickCheck(stringToToken "2"    == [Number (Integer 2)])
-    quickCheck(stringToToken "2.5"  == [Number (Decimal 2.5)])
+    quickCheck(stringToToken "2"    == [Value (ValueInt 2)])
+    quickCheck(stringToToken "2.5"  == [Value (ValueDouble 2.5)])
+    quickCheck(stringToToken "\"2.5\""  == [Value (ValueString "2.5")])
+    quickCheck(stringToToken "'3'"  == [Value (ValueChar '3')])
     quickCheck(stringToToken "toto" == [Word "toto"])
     quickCheck(stringToToken "!toto" == [TokenOp Not, Word "toto"])

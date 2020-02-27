@@ -5,7 +5,7 @@ module Tokenize
     , Op(..)
     , drawOp
     , Token(..)
-    , TypeNumber(..)
+    , ValueType(..)
     )
     where
 
@@ -39,10 +39,14 @@ drawOp Dif = "!="
 drawOp Assign = "="
 drawOp Power = "^"
 
-data TypeNumber = Integer Int | Decimal Double deriving (Show, Eq)
-
+data ValueType  = ValueDouble Double
+                | ValueInt Int
+                | ValueString String
+                | ValueChar Char
+                deriving (Show, Eq)
+ 
 data Token = Word String
-            | Number TypeNumber
+            | Value ValueType
             | TokenOpen
             | TokenClose
             | TokenOp Op
@@ -71,13 +75,17 @@ isFloat :: Char -> Bool
 isFloat '.' = True
 isFloat x = isDigit x
 
+isEndString :: Char -> Bool
+isEndString '"' = False
+isEndString x   = True
+
 reverseList :: [a] -> [a]
 reverseList [] = []
 reverseList (x:xs) = reverseList xs ++ [x]
 
-readNumber :: String -> TypeNumber
-readNumber x    | '.' `elem` x  = Decimal (read x :: Double)
-                | otherwise     = Integer (read x :: Int)
+readNumber :: String -> ValueType
+readNumber x    | '.' `elem` x  = ValueDouble (read x :: Double)
+                | otherwise     = ValueInt (read x :: Int)
 
 stringToToken :: String -> [Token]
 stringToToken [] = []
@@ -91,18 +99,19 @@ stringToToken s@(x:xs)  | x == '(' = TokenOpen                  : stringToToken 
                         | x == '/' = TokenOp Div                : stringToToken xs
                         | x == '^' = TokenOp Power              : stringToToken xs
                         | x == ';' = TokenComa                  : stringToToken xs
-                        | x == ':' = TokenType                  : stringToToken xs
-                        | x == '"' = TokenSQuote                : stringToToken xs
-                        | x == '\'' = TokenQuote                : stringToToken xs
+                        | x == '\''= Value (ValueChar (head xs)) : stringToToken (tail (tail xs))
                         | x == ',' = TokenSep                   : stringToToken xs
                         | isAlpha x = Word word                 : stringToToken restchar
                         | isSpace x = stringToToken xs
                         | x == '\n' = stringToToken xs
-                        | isDigit x = Number (readNumber num)   : stringToToken restnum
+                        | isDigit x = Value (readNumber num)   : stringToToken restnum
                             where
-                                (word, restchar) = break isSpeSpace s
-                                (num, restnum) = break (not . isFloat) s
-
+                                (word, restchar)     = break isSpeSpace s
+                                (num, restnum)       = break (not . isFloat) s
+--
+stringToToken ('"':x) = Value (ValueString string)   : stringToToken (tail reststring)
+                            where
+                                (string, reststring) = break (not . isEndString) x
 --
 stringToToken ('!':x)   | x == []       = error "Invalid not during Tokenization"
                         | head x == '=' = TokenOp Dif       : (stringToToken $ tail x)
