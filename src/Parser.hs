@@ -60,7 +60,7 @@ getTypefromExpr :: Expr -> ExprType
 getTypefromExpr (Var       _        exprtype)   = exprtype 
 getTypefromExpr (Val       _        exprtype)   = exprtype 
 getTypefromExpr (UnaryOp   Not _    exprtype)   = ExprBool 
-getTypefromExpr (UnaryOp   op _  exprtype)      = exprtype
+getTypefromExpr (UnaryOp   op _     exprtype)   = exprtype
 getTypefromExpr (Call      _ _      exprtype)   = exprtype 
 getTypefromExpr (Extern    _ _      exprtype)   = exprtype 
 getTypefromExpr (Function  _  _ _   exprtype)   = exprtype
