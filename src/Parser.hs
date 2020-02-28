@@ -57,39 +57,17 @@ typeValueToExpr (ValueChar   x) = ExprChar
 typeValueToExpr (ValueInt    x) = ExprInt
 
 getTypefromExpr :: Expr -> ExprType
-getTypefromExpr (Var       _        exprtype)       = exprtype 
-getTypefromExpr (Val       _        exprtype)       = exprtype 
-getTypefromExpr (UnaryOp   Not _    exprtype)       = ExprBool 
-getTypefromExpr (UnaryOp   Minus _      exprtype)   = exprtype 
-getTypefromExpr (UnaryOp   Plus _      exprtype)    = exprtype 
-getTypefromExpr (Call      _ _      exprtype)       = exprtype 
-getTypefromExpr (Extern    _ _      exprtype)       = exprtype 
-getTypefromExpr (Function  _  _ _   exprtype)       = exprtype
-getTypefromExpr (BinOp     _  _ _   exprtype)       = exprtype
-getTypefromExpr (If        _ _ _    exprtype)       = exprtype
-getTypefromExpr (For       _ _ _ _  exprtype)       = exprtype
-getTypefromExpr (List      _        exprtype)       = exprtype
-
-{-
-Parse an expresion value
--}
-parseValue :: Parser Expr
-parseValue (Value x:xs)         = Just ((Val x (typeValueToExpr x)), xs)
-parseValue (TokenOpen : xs)     = case parseExpr xs of
-    Just (expr, (TokenClose : ys))  -> Just (expr, ys)
-    Nothing                         -> error "Parse Value return nothing when token open is detected"
-parseValue (TokenOp op: xs)     = parseUnOp op xs
-
--- parseValue (Word n:xs)  | n `elem` symbols  =   Just (Symbol n recursive, rest)
---                         | n == "'"          =   case parseValue xs of
---                             Just (expr, ys) ->  Just (Symbol n [expr], ys)
---                             _               ->  error "Parse error for quote'"
---                         | otherwise         =   Just (KeyWord n, xs)
---                 where
---                     (recursive, rest) = parseExprs [] xs
-
--- Error for parsing the value
-parseValue x = error ("Token not recognize")
+getTypefromExpr (Var       _        exprtype)   = exprtype 
+getTypefromExpr (Val       _        exprtype)   = exprtype 
+getTypefromExpr (UnaryOp   Not _    exprtype)   = ExprBool 
+getTypefromExpr (UnaryOp   op _  exprtype)      = exprtype
+getTypefromExpr (Call      _ _      exprtype)   = exprtype 
+getTypefromExpr (Extern    _ _      exprtype)   = exprtype 
+getTypefromExpr (Function  _  _ _   exprtype)   = exprtype
+getTypefromExpr (BinOp     _  _ _   exprtype)   = exprtype
+getTypefromExpr (If        _ _ _    exprtype)   = exprtype
+getTypefromExpr (For       _ _ _ _  exprtype)   = exprtype
+getTypefromExpr (List      _        exprtype)   = exprtype
 
 parseUnOp :: Op -> Parser Expr
 parseUnOp Not tokens = case parseExpr tokens of
@@ -102,6 +80,25 @@ parseUnOp Minus tokens = case parseExpr tokens of
     Just (x, toks)      -> Just (UnaryOp Minus x (getTypefromExpr x), toks)
     _                   -> Nothing
 parseUnOp _ _          = error "Bad Unop symbol"
+
+
+-- parseAssign :: Expr Parser Expr
+-- parseIf tokens = 
+{-
+Parse an expresion value
+-}
+parseValue :: Parser Expr
+parseValue (Value x:xs)         = Just ((Val x (typeValueToExpr x)), xs)
+parseValue (TokenOpen : xs)     = case parseExpr xs of
+    Just (expr, (TokenClose : ys))  -> Just (expr, ys)
+    Nothing                         -> error "Parse Value return nothing when token open is detected"
+parseValue (TokenOp op: xs)     = parseUnOp op xs
+--
+-- parseValue (Word n:xs)  | n == "" = 
+--
+-- Error for parsing the value
+parseValue x = error ("Token not recognize")
+
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
