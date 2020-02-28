@@ -71,6 +71,8 @@ isSpeSpace :: Char -> Bool
 isSpeSpace x    | (isAlpha x) = False 
                 | (isDigit x) = False
                 | x == ';'    = True 
+                | x == ','    = True 
+                | x == ']'    = True 
                 | otherwise   = True 
 
 isFloat :: Char -> Bool
@@ -101,7 +103,7 @@ stringToToken s@(x:xs)  | x == '(' = TokenOpen                  : stringToToken 
                         | x == '/' = TokenOp Div                : stringToToken xs
                         | x == '^' = TokenOp Power              : stringToToken xs
                         | x == ';' = TokenComa                  : stringToToken xs
-                        | x == '\''= Value (ValueChar (head xs)) : stringToToken (tail (tail xs))
+                        | x == '\''= Value (ValueChar (head xs)): stringToToken (tail (tail xs))
                         | x == ',' = TokenSep                   : stringToToken xs
                         | isAlpha x = Word word                 : stringToToken restchar
                         | isSpace x = stringToToken xs

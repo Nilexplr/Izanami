@@ -82,8 +82,8 @@ parseUnOp Minus tokens = case parseExpr tokens of
     _                   -> Nothing
 parseUnOp _ _          = error "Bad Unop symbol"
 
--- parseFor :: Parser Expr
--- parseIf tokens = Nothing
+parseFor :: Parser Expr
+parseFor tokens = Nothing
 
 parseIf :: Parser Expr
 parseIf tokens = case parseExpr tokens of 
