@@ -1,5 +1,6 @@
 module Main where
 
+import JIT
 import Argument
 import Prompt
 import System.Exit
@@ -23,7 +24,9 @@ main = do
         Right   (opt)       -> do
                 allContents <- fmap concat $ mapM readFile $ pathFile opt
                 if interactive opt == True
-                    then handle onAbort $ launchPrompt $ (evalLisp allContents)
-                    else displayEval (evalLisp allContents) allContents
+                    then do
+                        print "Izanami koak 1.0.0  (default, Mar 01 2020, 23:42:00)"
+                        runKoak True allContents
+                    else runKoak False allContents
         Left    (Invalid)   -> exitWith $ ExitFailure 84
         _                   -> exitWith ExitSuccess
