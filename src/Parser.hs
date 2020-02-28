@@ -152,5 +152,5 @@ Launch the expression's parsing instance
 createAst :: [Token] -> Expr
 createAst [] = Ast [] None
 createAst tokens = case parseExprs [] tokens of
-    Just (result, [])       -> Ast result None
-    _                    -> error "bad parsing"
+    Just (result, [])   -> Ast result None
+    _                   -> error "bad parsing"

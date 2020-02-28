@@ -27,7 +27,7 @@ main = do
                 allContents <- fmap concat $ mapM readFile $ pathFile opt
                 if interactive opt == True
                     then do
-                        print "Izanami koak 1.0.0  (default, Mar 01 2020, 23:42:00)"
+                        hPutStr stderr "Izanami koak 1.0.0  (default, Mar 01 2020, 23:42:00)\n"
                         runKoak True allContents
                     else runKoak False allContents
         Left    (Invalid)   -> exitWith $ ExitFailure 84
