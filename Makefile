@@ -23,10 +23,11 @@ TU_SRC			= 	test/Spec.hs \
 all: $(PROJECT_NAME)
 
 $(PROJECT_NAME):
-	ghc $(MAIN) $(SRC) -o -optl -no-keep-hi-files -no-keep-o-files
+	ghc $(MAIN) $(SRC) -o koak -optl -no-keep-hi-files -no-keep-o-files
 
 tests_run:
-	ghc $(SRC) $(TU_SRC) -o koak -optl -no-keep-hi-files -no-keep-o-files
+	ghc $(SRC) $(TU_SRC) -o unit_test -optl -no-keep-hi-files -no-keep-o-files
+	./unit_test
 
 tests_run_coverage:
 	stack test --coverage --allow-different-user

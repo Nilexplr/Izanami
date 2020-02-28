@@ -11,18 +11,6 @@ import Data.Data
 
 type Parser a = [Token] -> Maybe(a, [Token])
 
-symbols =   [ "def"
-            , "extern"
-            , "if"
-            , "then"
-            , "else"
-            , "in"
-            , "for"
-            , "binary"
-            , "unary"
-            , "var"
-            ]
-
 data ExprType   = ExprDouble 
                 | ExprInt 
                 | ExprString 
@@ -35,6 +23,7 @@ data ExprType   = ExprDouble
 data Expr   = Var       String                          ExprType
             | Val       ValueType                       ExprType
             | UnaryOp   Op      Expr                    ExprType
+            | Assign    Expr    Expr                    ExprType
             | Call      String  [Expr]                  ExprType
             | Extern    String  [Expr]                  ExprType
             | Function  String  [Expr]  Expr            ExprType
@@ -46,9 +35,16 @@ data Expr   = Var       String                          ExprType
             deriving (Show, Eq)
 
 setTypeExpr :: Expr -> ExprType -> Expr
-setTypeExpr (Var x _) typage = Var x typage  
--- setTypeExpr (Val x _) typage = Val x typage  
--- setTypeExpr (Var x _) typage = Var x typage  
+setTypeExpr (Var       x        _)  typage = Var       x        typage  
+setTypeExpr (Val       x        _)  typage = Val       x        typage 
+setTypeExpr (UnaryOp   op x     _)  typage = UnaryOp   op x     typage
+setTypeExpr (Call      x y      _)  typage = Call      x y      typage 
+setTypeExpr (Extern    x y      _)  typage = Extern    x y      typage 
+setTypeExpr (Function  x y z    _)  typage = Function  x y z    typage
+setTypeExpr (BinOp     x y z    _)  typage = BinOp     x y z    typage
+setTypeExpr (If        x y z    _)  typage = If        x y z    typage
+setTypeExpr (For       x y z a  _)  typage = For       x y z a  typage
+setTypeExpr (List      x        _)  typage = List      x        typage 
 
 typeValueToExpr :: ValueType -> ExprType
 typeValueToExpr (ValueDouble x) = ExprDouble
@@ -81,9 +77,24 @@ parseUnOp Minus tokens = case parseExpr tokens of
     _                   -> Nothing
 parseUnOp _ _          = error "Bad Unop symbol"
 
+-- parseFor :: Parser Expr
+-- parseIf tokens = Nothing
 
--- parseAssign :: Expr Parser Expr
--- parseIf tokens = 
+parseIf :: Parser Expr
+parseIf tokens = case parseExpr tokens of 
+    Just (x, Word "then":xs)    ->  case parseExpr xs of
+        Just (y, Word "else":ys)    -> case parseExpr ys of
+            Just (z, zs)                -> Just (If x y (Just z) (getTypefromExpr y), zs)
+        Just (y, ys)                -> Just (If x y Nothing (getTypefromExpr y), ys)
+    _                           -> error "Bad If expressions"
+
+-- parseWhile :: Parser Expr
+-- parseWhile tokens = Nothing
+
+parseAssign :: Expr -> Parser Expr
+parseAssign name tokens = case parseExpr tokens of
+    Just (x, tokens)    -> Just (Assign (setTypeExpr name (getTypefromExpr x)) x (getTypefromExpr x), tokens)
+
 {-
 Parse an expresion value
 -}
@@ -94,8 +105,10 @@ parseValue (TokenOpen : xs)     = case parseExpr xs of
     Nothing                         -> error "Parse Value return nothing when token open is detected"
 parseValue (TokenOp op: xs)     = parseUnOp op xs
 --
--- parseValue (Word n:xs)  | n == "" = 
---
+parseValue (Word n:xs)  -- | n == "for" = parseFor xs
+                        | n == "if"  = parseIf xs
+                        | otherwise  = Just ((Var n None), xs)
+            --
 -- Error for parsing the value
 parseValue x = error ("Token not recognize")
 
@@ -108,6 +121,7 @@ parseBinOp previousExpr op tokens = case parseExpr tokens of
 parseExpr :: Parser Expr
 parseExpr token = case parseValue token of
     Just (x , (TokenOp op:xs))      -> parseBinOp x op xs
+    Just (x , (TokenAssign:xs))     -> parseAssign x xs
     Just (x , toks)-> Just (x, toks)
 
 {-
@@ -119,7 +133,7 @@ parseExprs list tokens =
     case parseExpr tokens of
     -- All the expressions have been parsed
     Just (expr, toks@(TokenComa : []))      -> Just (list ++ [expr], [])
-    -- if the next token is a close parenthesis, the recursive is over
+    -- Expr still left to parse
     Just (expr, toks@(TokenComa : xs))      -> parseExprs (list ++ [expr]) xs
     -- Error during the parsing    
     _                                       -> Nothing
