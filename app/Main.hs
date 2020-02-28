@@ -12,11 +12,10 @@ import Prelude hiding (catch)
 import Control.Exception
 import System.Exit
 
-main :: IO ()
-main = exitWith ExitSuccess
--- onAbort e = do
---     let x = show (e :: SomeException)
---     putStrLn $ "\nExit"
+
+onAbort e = do
+    let x = show (e :: SomeException)
+    putStrLn $ "\nExit"
 
 
 main :: IO ()
