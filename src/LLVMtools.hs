@@ -1,9 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module LLVMtools 
-    ( 
-    )
-    where
+module LLVMtools where
 
 import Parser
 import Tokenize
@@ -33,6 +30,7 @@ import System.IO
 import System.IO.Error
 import Data.Int
 import Data.Word
+import Data.Text.Lazy
 import Control.Monad.Trans
 import System.Console.Haskeline
 import Control.Monad.Except
@@ -55,8 +53,8 @@ fromASTToLLVM x = function "__anon_expr" [] Type.double $
     const $ flip runReaderT mempty $ fromExprsToLLVM [x] >>= ret
 
 fromExprsToLLVM :: [Expr] -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
-fromExprsToLLVM ((Val (TInt x)):xs) = pure $ ConstantOperand (Float (Double (fromIntegral x)))
-fromExprsToLLVM ((BinOp op xp1 xp2):xs) = do
+fromExprsToLLVM ((Val (ValueInt x) ExprInt):xs) = pure $ ConstantOperand (Float (Double (fromIntegral x)))
+fromExprsToLLVM ((BinOp op xp1 xp2 ExprInt):xs) = do
     op1 <- fromExprsToLLVM [xp1]
     op2 <- fromExprsToLLVM [xp2]
     tmp <- instr op1 op2

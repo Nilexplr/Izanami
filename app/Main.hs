@@ -1,6 +1,7 @@
 module Main where
 
 import JIT
+import Koak
 import Argument
 import Prompt
 import System.Exit

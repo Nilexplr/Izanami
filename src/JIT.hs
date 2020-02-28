@@ -1,13 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module JIT 
-    ( runKoak
-    , jit
-    )
-    where
+module JIT where
 
-import Prompt
-import Compile
 import Utils
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -31,26 +25,6 @@ data JITEnv = JITEnv
     , jitEnvCompileLayer :: IRCompileLayer ObjectLinkingLayer
     , jitEnvModuleKey :: ModuleKey
     }
-
-runKoak :: Bool -> String -> IO ()
-runKoak isPrompt content = do
-    withContext $ \ctx -> withHostTargetMachine $ \tm -> do
-        withExecutionSession $ \exSession ->
-            withSymbolResolver exSession (SymbolResolver symResolver) $ \symResolverPtr ->
-                withObjectLinkingLayer exSession (const $ pure symResolverPtr) $ \linkingLayer ->
-                    withIRCompileLayer linkingLayer tm $ \compLayer -> do
-                        withModuleKey exSession $ \mdlKey -> if isPrompt == True
-                            then do
-                                let env = JITEnv ctx compLayer mdlKey
-                                ast <- runReaderT (buildModuleT "main" prompt) env
-                                return ()
-                            else do
-                                let env = JITEnv ctx compLayer mdlKey
-                                ast <- runReaderT (buildModuleT "main" compile) env
-                                return ()
-
-symResolver :: MangledSymbol -> IO (Either JITSymbolError JITSymbol)
-symResolver sym = undefined
 
 foreign import ccall "dynamic" mkFun :: FunPtr (IO Double) -> IO Double
 
