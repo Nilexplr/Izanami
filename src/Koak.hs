@@ -82,8 +82,10 @@ prompt = do
     mline <- liftIO $ catchIOError (Just <$> getLine) eofHandler
     case mline of
         Nothing -> return ()
+        Just "" -> prompt
         Just l -> do
-            liftIO $ print $ createAst $ stringToToken l
+            -- Uncomment for print AST:
+            -- liftIO $ print $ createAst $ stringToToken l
             anon <- isAnonExpr <$> hoist (fromASTToLLVM $ createAst $ stringToToken l)
             def <- mostRecentDef
             ast <- moduleSoFar "main"

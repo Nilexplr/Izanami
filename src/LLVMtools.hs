@@ -30,7 +30,6 @@ import System.IO
 import System.IO.Error
 import Data.Int
 import Data.Word
-import Data.Text.Lazy
 import Control.Monad.Trans
 import System.Console.Haskeline
 import Control.Monad.Except
@@ -49,12 +48,12 @@ fromASTToLLVM :: Expr -> ModuleBuilder Operand
 
 -- buildAST (Extern (Prototype nameStr params)) =
 --   extern (fromString nameStr) (replicate (length params) Type.double) Type.double
-fromASTToLLVM x = function "__anon_expr" [] Type.double $
-    const $ flip runReaderT mempty $ fromExprsToLLVM [x] >>= ret
+fromASTToLLVM (Ast x _) = function "__anon_expr" [] Type.double $
+    const $ flip runReaderT mempty $ fromExprsToLLVM x >>= ret
 
 fromExprsToLLVM :: [Expr] -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
-fromExprsToLLVM ((Val (ValueInt x) ExprInt):xs) = pure $ ConstantOperand (Float (Double (fromIntegral x)))
-fromExprsToLLVM ((BinOp op xp1 xp2 ExprInt):xs) = do
+fromExprsToLLVM ((Val (ValueInt x) _):xs) = pure $ ConstantOperand (Float (Double (fromIntegral x)))
+fromExprsToLLVM ((BinOp op xp1 xp2 _):xs) = do
     op1 <- fromExprsToLLVM [xp1]
     op2 <- fromExprsToLLVM [xp2]
     tmp <- instr op1 op2
@@ -63,3 +62,4 @@ fromExprsToLLVM ((BinOp op xp1 xp2 ExprInt):xs) = do
             instr = case op of
                 Plus -> fadd
                 Minus -> fsub
+fromExprsToLLVM ((Ast x _):xs)                  = fromExprsToLLVM x

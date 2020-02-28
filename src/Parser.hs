@@ -41,7 +41,7 @@ data Expr   = Var       String                          ExprType
             | If        Expr    Expr    (Maybe Expr)    ExprType
             | For       String  Expr    Expr    Expr    ExprType
             | List      [Expr]                          ExprType
-            | AST       [Expr]                          ExprType
+            | Ast       [Expr]                          ExprType
             deriving (Show, Eq)
 
 setTypeExpr :: Expr -> ExprType -> Expr
@@ -111,7 +111,7 @@ parseExprs list tokens =
 Launch the expression's parsing instance
 -}
 createAst :: [Token] -> Expr
-createAst [] = AST [] None
+createAst [] = Ast [] None
 createAst tokens = case parseExprs [] tokens of
-    Just (result, [])   -> AST result None
+    Just (result, [])   -> Ast result None
     _                   -> error "bad parsing"

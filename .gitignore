@@ -10,3 +10,4 @@ Utils.hs
 *.bs
 *.o
 *.out
+*.hi
