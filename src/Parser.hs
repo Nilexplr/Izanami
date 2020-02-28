@@ -24,6 +24,7 @@ data Expr   = Var       String                          ExprType
             | Val       ValueType                       ExprType
             | UnaryOp   Op      Expr                    ExprType
             | Assign    Expr    Expr                    ExprType
+            | While     Expr    Expr                    ExprType
             | Call      String  [Expr]                  ExprType
             | Extern    String  [Expr]                  ExprType
             | Function  String  [Expr]  Expr            ExprType
@@ -39,6 +40,8 @@ setTypeExpr (Var       x        _)  typage = Var       x        typage
 setTypeExpr (Val       x        _)  typage = Val       x        typage 
 setTypeExpr (UnaryOp   op x     _)  typage = UnaryOp   op x     typage
 setTypeExpr (Call      x y      _)  typage = Call      x y      typage 
+setTypeExpr (Assign    x y      _)  typage = Assign    x y      typage 
+setTypeExpr (While     x y      _)  typage = While     x y      typage 
 setTypeExpr (Extern    x y      _)  typage = Extern    x y      typage 
 setTypeExpr (Function  x y z    _)  typage = Function  x y z    typage
 setTypeExpr (BinOp     x y z    _)  typage = BinOp     x y z    typage
@@ -58,6 +61,8 @@ getTypefromExpr (Val       _        exprtype)   = exprtype
 getTypefromExpr (UnaryOp   Not _    exprtype)   = ExprBool 
 getTypefromExpr (UnaryOp   op _     exprtype)   = exprtype
 getTypefromExpr (Call      _ _      exprtype)   = exprtype 
+getTypefromExpr (While     _ _      exprtype)   = exprtype 
+getTypefromExpr (Assign    _ _      exprtype)   = exprtype 
 getTypefromExpr (Extern    _ _      exprtype)   = exprtype 
 getTypefromExpr (Function  _  _ _   exprtype)   = exprtype
 getTypefromExpr (BinOp     _  _ _   exprtype)   = exprtype
@@ -88,8 +93,10 @@ parseIf tokens = case parseExpr tokens of
         Just (y, ys)                -> Just (If x y Nothing (getTypefromExpr y), ys)
     _                           -> error "Bad If expressions"
 
--- parseWhile :: Parser Expr
--- parseWhile tokens = Nothing
+parseWhile :: Parser Expr
+parseWhile tokens = case parseExpr tokens of
+    Just (x, Word "do":xs) -> case parseExpr xs of
+        Just (y, yz)    -> Just (While x y (getTypefromExpr x), yz)
 
 parseAssign :: Expr -> Parser Expr
 parseAssign name tokens = case parseExpr tokens of
@@ -106,12 +113,12 @@ parseValue (TokenOpen : xs)     = case parseExpr xs of
 parseValue (TokenOp op: xs)     = parseUnOp op xs
 --
 parseValue (Word n:xs)  -- | n == "for" = parseFor xs
-                        | n == "if"  = parseIf xs
-                        | otherwise  = Just ((Var n None), xs)
+                        | n == "if"     = parseIf xs
+                        | n == "while"  = parseWhile xs
+                        | otherwise     = Just ((Var n None), xs)
             --
 -- Error for parsing the value
 parseValue x = error ("Token not recognize")
-
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
@@ -145,5 +152,5 @@ Launch the expression's parsing instance
 createAst :: [Token] -> Expr
 createAst [] = Ast [] None
 createAst tokens = case parseExprs [] tokens of
-    Just (result, [])   -> Ast result None
-    _                   -> error "bad parsing"
+    Just (result, [])       -> Ast result None
+    _                    -> error "bad parsing"
