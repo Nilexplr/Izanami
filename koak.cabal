@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b407edb8318a1133759a295a24fea13a322bc0d998aec6417cf22087decb7572
+-- hash: 122c04f7b6c064ed1c61a7c7025136a74b4b9e7104d0b97425c61152ae586a60
 
 name:           koak
 version:        0.1.0.0
@@ -27,9 +27,15 @@ source-repository head
 
 library
   exposed-modules:
+      Argument
+      Compile
+      JIT
       Lib
+      LLVMtools
       Parser
+      Prompt
       Tokenize
+      Utils
   other-modules:
       Paths_koak
   hs-source-dirs:

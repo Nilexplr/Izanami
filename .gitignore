@@ -1,2 +1,12 @@
 .stack-work/
 *~
+AST.hs
+LLVMtools.hs
+Main.hs
+Utils.hs
+*.sh
+*.s
+*.llvm
+*.bs
+*.o
+*.out
