@@ -41,6 +41,7 @@ data ValueType  = ValueDouble Double
                 | ValueInt Int
                 | ValueString String
                 | ValueChar Char
+                | ValueBool Bool
                 deriving (Show, Eq)
  
 data Token = Word String
@@ -67,8 +68,10 @@ cleanString s@('#':xs) = cleanString restString
 cleanString (x:xs) = x : cleanString xs
 
 isSpeSpace :: Char -> Bool
-isSpeSpace ')' = True
-isSpeSpace x = isSpace x 
+isSpeSpace x    | (isAlpha x) = False 
+                | (isDigit x) = False
+                | x == ';'    = True 
+                | otherwise   = True 
 
 isFloat :: Char -> Bool
 isFloat '.' = True

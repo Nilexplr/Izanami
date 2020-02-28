@@ -12,6 +12,7 @@ import Prelude hiding (catch)
 import Control.Exception
 import System.Exit
 
+
 onAbort e = do
     let x = show (e :: SomeException)
     putStrLn $ "\nExit"
