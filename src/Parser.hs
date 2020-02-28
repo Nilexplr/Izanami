@@ -27,6 +27,7 @@ data ExprType   = ExprDouble
                 | ExprInt 
                 | ExprString 
                 | ExprChar
+                | ExprBool
                 | None
                 deriving (Eq, Show, Typeable)
            
@@ -55,6 +56,19 @@ typeValueToExpr (ValueString x) = ExprString
 typeValueToExpr (ValueChar   x) = ExprChar
 typeValueToExpr (ValueInt    x) = ExprInt
 
+getTypefromExpr :: Expr -> ExprType
+getTypefromExpr (Var       _        exprtype)       = exprtype 
+getTypefromExpr (Val       _        exprtype)       = exprtype 
+getTypefromExpr (UnaryOp   Not _    exprtype)       = ExprBool 
+getTypefromExpr (UnaryOp   Minus _      exprtype)   = exprtype 
+getTypefromExpr (UnaryOp   Plus _      exprtype)    = exprtype 
+getTypefromExpr (Call      _ _      exprtype)       = exprtype 
+getTypefromExpr (Extern    _ _      exprtype)       = exprtype 
+getTypefromExpr (Function  _  _ _   exprtype)       = exprtype
+getTypefromExpr (BinOp     _  _ _   exprtype)       = exprtype
+getTypefromExpr (If        _ _ _    exprtype)       = exprtype
+getTypefromExpr (For       _ _ _ _  exprtype)       = exprtype
+getTypefromExpr (List      _        exprtype)       = exprtype
 
 {-
 Parse an expresion value
@@ -64,6 +78,7 @@ parseValue (Value x:xs)         = Just ((Val x (typeValueToExpr x)), xs)
 parseValue (TokenOpen : xs)     = case parseExpr xs of
     Just (expr, (TokenClose : ys))  -> Just (expr, ys)
     Nothing                         -> error "Parse Value return nothing when token open is detected"
+parseValue (TokenOp op: xs)     = parseUnOp op xs
 
 -- parseValue (Word n:xs)  | n `elem` symbols  =   Just (Symbol n recursive, rest)
 --                         | n == "'"          =   case parseValue xs of
@@ -73,14 +88,20 @@ parseValue (TokenOpen : xs)     = case parseExpr xs of
 --                 where
 --                     (recursive, rest) = parseExprs [] xs
 
-parseValue (TokenOpen : (TokenClose:xs))    = error "Invalid syntax"
 -- Error for parsing the value
 parseValue x = error ("Token not recognize")
 
--- parseUnOp :: Op -> Parser Expr
--- parseUnOp op tokens = case parseExpr tokens of
---     Just (x, toks)      -> Just (BinOp op previousExpr x None, toks)
---     _                   -> Nothing
+parseUnOp :: Op -> Parser Expr
+parseUnOp Not tokens = case parseExpr tokens of
+    Just (x, toks)      -> Just (UnaryOp Not x ExprBool, toks)
+    _                   -> Nothing
+parseUnOp Plus tokens = case parseExpr tokens of
+    Just (x, toks)      -> Just (UnaryOp Plus x (getTypefromExpr x), toks)
+    _                   -> Nothing
+parseUnOp Minus tokens = case parseExpr tokens of
+    Just (x, toks)      -> Just (UnaryOp Minus x (getTypefromExpr x), toks)
+    _                   -> Nothing
+parseUnOp _ _          = error "Bad Unop symbol"
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of

@@ -41,6 +41,7 @@ data ValueType  = ValueDouble Double
                 | ValueInt Int
                 | ValueString String
                 | ValueChar Char
+                | ValueBool Bool
                 deriving (Show, Eq)
  
 data Token = Word String
