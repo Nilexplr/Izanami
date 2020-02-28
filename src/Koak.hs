@@ -57,16 +57,18 @@ symResolver sym = undefined
 
 compileKoak :: String -> ModuleBuilderT (ReaderT JITEnv IO) ()
 compileKoak str = do
-    liftIO $ print $ createAst $ stringToToken str
+    -- Uncomment for print AST:
+    -- liftIO $ print $ createAst $ stringToToken str
     anon <- isAnonExpr <$> hoist (fromASTToLLVM $ createAst $ stringToToken str)
     def <- mostRecentDef
     ast <- moduleSoFar "main"
     ctx <- lift $ asks jitEnvContext
     env <- lift ask
     liftIO $ withModuleFromAST ctx ast $ \mdl -> do
-        Text.hPutStrLn stderr $ ppll def
+        -- Uncomment for print LLVM code:
+        -- Text.hPutStrLn stderr $ ppll def
         writeFile "temp.bs" (unpack (ppll def))
-        system "llc temp.bs && gcc -c temp.bs.s -o file.o && gcc file.o -o a.out && rm -f temp.bs temp.bs.s file.o || echo ERROR"
+        system "llc temp.bs && gcc -c temp.bs.s -o file.o && gcc file.o main.o -o a.out && rm -f temp.bs temp.bs.s file.o || echo ERROR"
         let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
         -- this returns true if the module was modified
         withPassManager spec $ flip runPassManager mdl
