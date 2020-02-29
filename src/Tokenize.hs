@@ -17,7 +17,9 @@ data Op = Plus
         | Div
         | Mod
         | Inf
+        | InfEq
         | Sup
+        | SupEq
         | Eq
         | Not
         | Dif
@@ -68,8 +70,12 @@ cleanString s@('#':xs) = cleanString restString
 cleanString (x:xs) = x : cleanString xs
 
 isSpeSpace :: Char -> Bool
-isSpeSpace ')' = True
-isSpeSpace x = isSpace x 
+isSpeSpace x    | (isAlpha x) = False 
+                | (isDigit x) = False
+                | x == ';'    = True 
+                | x == ','    = True 
+                | x == ']'    = True 
+                | otherwise   = True 
 
 isFloat :: Char -> Bool
 isFloat '.' = True
@@ -97,9 +103,11 @@ stringToToken s@(x:xs)  | x == '(' = TokenOpen                  : stringToToken 
                         | x == '<' = TokenOp Inf                : stringToToken xs
                         | x == '>' = TokenOp Sup                : stringToToken xs
                         | x == '/' = TokenOp Div                : stringToToken xs
+                        | x == '%' = TokenOp Mod                : stringToToken xs
                         | x == '^' = TokenOp Power              : stringToToken xs
+                        | x == ':' = TokenType                  : stringToToken xs
                         | x == ';' = TokenComa                  : stringToToken xs
-                        | x == '\''= Value (ValueChar (head xs)) : stringToToken (tail (tail xs))
+                        | x == '\''= Value (ValueChar (head xs)): stringToToken (tail (tail xs))
                         | x == ',' = TokenSep                   : stringToToken xs
                         | isAlpha x = Word word                 : stringToToken restchar
                         | isSpace x = stringToToken xs
@@ -121,3 +129,5 @@ stringToToken ('=':x)   | x == []       = error "Invalid assignation during Toke
                         | head x == '=' = TokenOp Eq      : (stringToToken $ tail x)
                         | otherwise     = TokenAssign  : stringToToken x
 stringToToken _ = error "Invalid character"
+
+
