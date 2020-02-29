@@ -33,8 +33,10 @@ import Data.Word
 import Control.Monad.Trans
 import System.Console.Haskeline
 import Control.Monad.Except
+import Control.Monad.Fix
 import LLVM.Target
 import LLVM.CodeModel
+import Numeric
 
 type Binds = Map.Map String Operand
 
@@ -71,6 +73,27 @@ fromExprsToLLVM xpr@(Var name _) = do
                                 -- where
                                 --     variables = ask 
 -- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
+--
+fromExprsToLLVM expr@(If cond thenexpr elsexpr xtype) = mdo
+    ifB <- block `named` "if"
+
+    let zero = ConstantOperand (Float (Double 0))
+    condV <- fromExprsToLLVM cond
+    cmp <- fcmp ONE zero condV `named` "cmp"
+
+    condBr cmp thenB elseB
+
+    thenB <- block `named` "then"
+    thenOp <- fromExprsToLLVM thenexpr
+    br mergeB   
+
+    elseB <- block `named` "else"
+    elseOp <- fromExprsToLLVM elsexpr
+    br mergeB   
+
+    mergeB <- block `named` "ifcont"
+    phi [(thenOp, thenB), (elseOp, elseB)]
+
 fromExprsToLLVM expr    = error "Invalid"
 
 {-
@@ -135,25 +158,6 @@ fromBinOpToLLVM (BinOp op xp1 xp2 xtype)   = do
                                     ExprDouble  -> (fcmp ONE)
                                     _           -> error "Invalid type for binOP"
                 _       -> error "Invalid op"
---
-fromExprsToLLVM expr@(If _ _ _ _) = mdo
-    _ifB RecursiveDo block `named` "if"
-    let zero = ConstantOperand (Float (Double 0))
-    condV <- fromValToLLVM cond (getTypefromExpr cond)
-    cmp <- fcmp ONE zero condV `named` "cmp"
-
-    condBr cmp thenB elseB
-
-    thenB <- block `named` "then"
-    thenOp <- fromValToLLVM thenexpr (getTypefromExpr thenexpr)
-    br mergeB
-
-    elseB <- block `named` "else"
-    elseOp <- fromValToLLVM elsexpr (getTypefromExpr elsexpr)
-    br mergeB
-
-    mergeB <- block `named` "ifcont"
-    phi [(thenOp, thenB), (elseOp, elseB)]
 
 {-
 |   @fromValToLLVM

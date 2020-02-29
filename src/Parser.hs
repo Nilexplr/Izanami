@@ -7,6 +7,7 @@ module Parser
     )
     where
 
+
 import Tokenize
 import Data.Data
 

@@ -6,10 +6,12 @@ module Tokenize
     , drawOp
     , Token(..)
     , ValueType(..)
+    ,toto 
     )
     where
 
 import Data.Char
+import Control.Monad.Trans.Reader
 
 data Op = Plus
         | Minus
@@ -130,4 +132,7 @@ stringToToken ('=':x)   | x == []       = error "Invalid assignation during Toke
                         | otherwise     = TokenAssign  : stringToToken x
 stringToToken _ = error "Invalid character"
 
+
+toto = mdo
+    a <- getChar
 
