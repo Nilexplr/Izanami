@@ -3,6 +3,7 @@ module Parser
     , ValueType(..)
     , createAst
     , ExprType(..)
+    , getTypefromExpr
     )
     where
 
@@ -178,7 +179,7 @@ parseValue x = error ("Token not recognize" ++ (show x))
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
-    Just (x, toks)      -> Just (BinOp op previousExpr x None, toks)  
+    Just (x, toks)      -> Just (BinOp op previousExpr x (getTypefromExpr x), toks)  
     _                   -> Nothing
 
 parseExpr :: Parser Expr
