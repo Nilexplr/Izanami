@@ -20,19 +20,19 @@ data ExprType   = ExprDouble
                 deriving (Eq, Show, Typeable)
            
             
-data Expr   = Var       String                          ExprType
-            | Val       ValueType                       ExprType
-            | UnaryOp   Op      Expr                    ExprType
-            | Assign    Expr    Expr                    ExprType
-            | While     Expr    Expr                    ExprType
-            | Call      String  [Expr]                  ExprType
-            | Extern    String  [Expr]                  ExprType
-            | Function  String  [Expr]  Expr            ExprType
-            | BinOp     Op      Expr    Expr            ExprType
-            | If        Expr    Expr    (Maybe Expr)    ExprType
-            | For       Expr    Expr    Expr    Expr    ExprType
-            | List      [Expr]                          ExprType
-            | Ast       [Expr]                          ExprType
+data Expr   = Var       String                                  ExprType --
+            | Val       ValueType                               ExprType --
+            | UnaryOp   Op      Expr                            ExprType --
+            | Assign    Expr    Expr                            ExprType --
+            | While     Expr    Expr                            ExprType --
+            | Call      String  [Expr]                          ExprType --
+            | Extern    String  [Expr]                          ExprType --
+            | Function  String  [Expr]  Expr                    ExprType --
+            | BinOp     Op      Expr    Expr                    ExprType -- ~FIX EVAL~
+            | If        Expr    Expr    (Maybe Expr)            ExprType --
+            | For       Expr    Expr    (Maybe Expr)    Expr    ExprType --
+            | List      Expr    Expr                            ExprType
+            | Ast       [Expr]                                  ExprType --
             deriving (Show, Eq)
 
 getTypeFromTypeName :: Expr -> ExprType
@@ -58,7 +58,7 @@ setTypeExpr (Function  x y z    _)  typage = Function  x y z    typage
 setTypeExpr (BinOp     x y z    _)  typage = BinOp     x y z    typage
 setTypeExpr (If        x y z    _)  typage = If        x y z    typage
 setTypeExpr (For       x y z a  _)  typage = For       x y z a  typage
-setTypeExpr (List      x        _)  typage = List      x        typage 
+setTypeExpr (List      x y      _)  typage = List      x y      typage 
 
 typeValueToExpr :: ValueType -> ExprType
 typeValueToExpr (ValueDouble x) = ExprDouble
@@ -79,7 +79,7 @@ getTypefromExpr (Function  _  _ _   exprtype)   = exprtype
 getTypefromExpr (BinOp     _  _ _   exprtype)   = exprtype
 getTypefromExpr (If        _ _ _    exprtype)   = exprtype
 getTypefromExpr (For       _ _ _ _  exprtype)   = exprtype
-getTypefromExpr (List      _        exprtype)   = exprtype
+getTypefromExpr (List      _ _      exprtype)   = exprtype
 
 parseUnOp :: Op -> Parser Expr
 parseUnOp Not tokens = case parseExpr tokens of
@@ -98,9 +98,11 @@ parseFor tokens = case parseExpr tokens of
     Just (x, TokenSep:xs)   -> case parseExpr xs of
         Just (y, TokenSep:ys)   -> case parseExpr ys of
             Just (z, Word "in":zs)  -> case parseExpr zs of
-                Just (final, restoks) -> Just (For x y z final (getTypefromExpr x), restoks)
+                Just (final, restoks) -> Just (For x y  (Just z) final (getTypefromExpr x), restoks)
                 _                     -> error "Bad in parsing for expr"
             _                     -> error "Bad third sep parsing for expr"
+        Just (z, Word "in":zs)  -> case parseExpr zs of
+            Just (final, restoks) -> Just (For x z Nothing final (getTypefromExpr x), restoks)
         _                     -> error "Bad second sep parsing for expr"
     _                     -> error "Bad first sep parsing for expr"
 
@@ -125,25 +127,36 @@ parseAPrototype :: Parser Expr
 parseAPrototype tok = case parseValue tok of
     Just ((Var n _), TokenType:xs) -> case parseValue xs of
         Just (y, ys) -> Just (Var n (getTypeFromTypeName y), ys)
+    Just (x, xs) -> Just (x, xs)
 
 parsePrototype :: [Expr] ->  Parser [Expr]
 parsePrototype tab (TokenOpen:xs)   =  case parseAPrototype xs of
-    Just (expr, toks@(TokenClose: xs))      -> Just (tab ++ [expr], xs)
-    Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) xs
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) toks
     _                                       -> Nothing
-parsePrototype tab (Word n:xs)      = case parseAPrototype xs of
-    Just (expr, toks@(TokenClose: xs))      -> Just (tab ++ [expr], xs)
-    Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) xs
+parsePrototype tab tokens           = case parseAPrototype tokens of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) toks
     _                                       -> Nothing  
-parsePrototype _ _ = error "Bad parsing into prototype" 
 
 
 parseDef :: Parser Expr
-parseDef tokens = case parseExpr tokens of
+parseDef tokens = case parseValue tokens of
     Just ((Var name _), xs) -> case parsePrototype [] xs of
         Just (proto, (TokenType:ys)) -> case parseValue ys of
             Just (x, rest) -> case parseExpr rest of
                 Just (z, zs) -> Just (Function name proto z (getTypeFromTypeName x), zs)
+
+
+parseCall :: String -> Parser Expr
+parseCall name toks = case parsePrototype [] toks of
+    Just (xprs, rest)   -> Just (Call name xprs None, rest) 
+
+parseExtern :: Parser Expr
+parseExtern toks = case parseValue toks of
+    Just ((Var name _), xs) -> case parsePrototype [] xs of
+        Just (xprs, rest)   -> Just (Extern name xprs None, rest) 
+                
 {-
 Parse an expresion value
 -}
@@ -158,10 +171,11 @@ parseValue (Word n:xs)  | n == "for"    = parseFor xs
                         | n == "if"     = parseIf xs
                         | n == "while"  = parseWhile xs
                         | n == "def"    = parseDef xs
+                        | n == "extern" = parseExtern xs
                         | otherwise     = Just ((Var n None), xs)
             --
 -- Error for parsing the value
-parseValue x = error ("Token not recognize")
+parseValue x = error ("Token not recognize" ++ (show x))
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
@@ -170,9 +184,12 @@ parseBinOp previousExpr op tokens = case parseExpr tokens of
 
 parseExpr :: Parser Expr
 parseExpr token = case parseValue token of
-    Just (x , (TokenOp op:xs))      -> parseBinOp x op xs
-    Just (x , (TokenAssign:xs))     -> parseAssign x xs
-    Just (x , toks)-> Just (x, toks)
+    Just (x , (TokenOp op:xs))              -> parseBinOp x op xs
+    Just (x , (TokenAssign:xs))             -> parseAssign x xs
+    Just ((Var x _), tokz@(TokenOpen:xs))   -> parseCall x xs
+    Just (x, tokz@(TokenType:xs))           -> case parseExpr xs of
+        Just (y, rest)  -> Just (List x y None, rest)
+    Just (x , toks)                         -> Just (x, toks)
 
 {-
 Parse several expressions

@@ -129,3 +129,5 @@ stringToToken ('=':x)   | x == []       = error "Invalid assignation during Toke
                         | head x == '=' = TokenOp Eq      : (stringToToken $ tail x)
                         | otherwise     = TokenAssign  : stringToToken x
 stringToToken _ = error "Invalid character"
+
+
