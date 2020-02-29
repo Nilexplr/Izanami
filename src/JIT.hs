@@ -3,6 +3,7 @@
 module JIT where
 
 import Utils
+import Parser
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
@@ -26,11 +27,27 @@ data JITEnv = JITEnv
     , jitEnvModuleKey :: ModuleKey
     }
 
-foreign import ccall "dynamic" mkFun :: FunPtr (IO Double) -> IO Double
+-- data IONu = Int | Double
 
-jit :: JITEnv -> Module -> IO Double
-jit JITEnv{jitEnvCompileLayer=compLayer, jitEnvModuleKey=mdlKey} mdl =
+foreign import ccall "dynamic" mkFunDouble :: FunPtr (IO Double) -> IO Double
+foreign import ccall "dynamic" mkFunInt :: FunPtr (IO Int) -> IO Int
+
+jitd :: JITEnv -> Module -> IO Double
+jitd JITEnv{jitEnvCompileLayer=compLayer, jitEnvModuleKey=mdlKey} mdl =
     withModule compLayer mdlKey mdl $ do
         mangled <- mangleSymbol compLayer "__anon_expr"
         Right (JITSymbol fPtr _) <- findSymbolIn compLayer mdlKey mangled False
-        mkFun (castPtrToFunPtr (wordPtrToPtr fPtr))
+        mkFunDouble (castPtrToFunPtr (wordPtrToPtr fPtr))
+
+jiti :: JITEnv -> Module -> IO Int
+jiti JITEnv{jitEnvCompileLayer=compLayer, jitEnvModuleKey=mdlKey} mdl =
+    withModule compLayer mdlKey mdl $ do
+        mangled <- mangleSymbol compLayer "__anon_expr"
+        Right (JITSymbol fPtr _) <- findSymbolIn compLayer mdlKey mangled False
+        mkFunInt (castPtrToFunPtr (wordPtrToPtr fPtr))
+
+
+        -- case xtype of
+        --     ExprInt     -> mkFunInt (castPtrToFunPtr (wordPtrToPtr fPtr))
+        --     ExprDouble  -> mkFunDouble (castPtrToFunPtr (wordPtrToPtr fPtr))
+        --     _           -> error "Invalid ExprType"

@@ -69,10 +69,10 @@ compileKoak str = do
         -- Text.hPutStrLn stderr $ ppll def
         writeFile "temp.bs" (unpack (ppll def))
         system "llc temp.bs && gcc -c temp.bs.s -o file.o && gcc file.o main.o -o a.out && rm -f temp.bs temp.bs.s file.o || echo ERROR"
-        let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
+        -- let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
         -- this returns true if the module was modified
-        withPassManager spec $ flip runPassManager mdl
-        when anon (jit env mdl >>= hPrint stderr)
+        -- withPassManager spec $ flip runPassManager mdl
+        -- when anon (jitd env mdl >>= hPrint stderr)
     when anon (removeDef def)
     where
         isAnonExpr (ConstantOperand (GlobalReference _ "__anon_expr")) = True
@@ -86,8 +86,11 @@ prompt = do
         Nothing -> return ()
         Just "" -> prompt
         Just l -> do
+            let ast     = createAst $ stringToToken l
+            let xtype   = case ast of
+                            Ast (x:xs) _ -> getTypefromExpr x 
             -- Uncomment for print AST:
-            -- liftIO $ print $ createAst $ stringToToken l
+            liftIO $ print ast
             anon <- isAnonExpr <$> hoist (fromASTToLLVM $ createAst $ stringToToken l)
             def <- mostRecentDef
             ast <- moduleSoFar "main"
@@ -95,11 +98,11 @@ prompt = do
             env <- lift ask
             liftIO $ withModuleFromAST ctx ast $ \mdl -> do
                 -- Uncomment for print LLVM code:
-                -- Text.hPutStrLn stderr $ ppll def
+                Text.hPutStrLn stderr $ ppll def
                 let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
                 -- this returns true if the module was modified
                 withPassManager spec $ flip runPassManager mdl
-                when anon (jit env mdl >>= hPrint stderr)
+                when anon (jit env mdl xtype >>= hPrint stderr)
             when anon (removeDef def)
             prompt
     where
@@ -108,3 +111,6 @@ prompt = do
             | otherwise = ioError e
         isAnonExpr (ConstantOperand (GlobalReference _ "__anon_expr")) = True
         isAnonExpr _ = False
+        jit env mdl xtype = case xtype of
+                                ExprInt     -> jiti env mdl
+                                -- ExprDouble  -> jitd env mdl
