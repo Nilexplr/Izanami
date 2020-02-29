@@ -17,8 +17,7 @@ data ExprType   = ExprDouble
                 | ExprChar
                 | ExprBool
                 | None
-                deriving (Eq, Show, Typeable)
-           
+                deriving (Eq, Show, Typeable)      
             
 data Expr   = Var       String                                  ExprType --
             | Val       ValueType                               ExprType --
@@ -31,7 +30,7 @@ data Expr   = Var       String                                  ExprType --
             | BinOp     Op      Expr    Expr                    ExprType -- ~FIX EVAL~
             | If        Expr    Expr    (Maybe Expr)            ExprType --
             | For       Expr    Expr    (Maybe Expr)    Expr    ExprType --
-            | List      Expr    Expr                            ExprType
+            | List      Expr    Expr                            ExprType --
             | Ast       [Expr]                                  ExprType --
             deriving (Show, Eq)
 
