@@ -54,9 +54,34 @@ fromASTToLLVM :: Expr -> ModuleBuilder Operand
 fromASTToLLVM (Ast (x:xs) xtype) = function "__anon_expr" [] Type.double $
     const $ flip runReaderT mempty $ fromExprsToLLVM x >>= ret
 
+{-
+|   @fromExprsToLLVM
+|   transform an Expr into a LLVM AST
+-}
 fromExprsToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
--- BinOp transformation from Expr to LLVM ast (changing instr in function of type)
-fromExprsToLLVM (BinOp op xp1 xp2 xtype)   = do
+fromExprsToLLVM xpr@(BinOp _ _ _ _)         = fromBinOpToLLVM xpr
+fromExprsToLLVM xpr@(Val _ xtype)           = fromValToLLVM xpr xtype
+fromExprsToLLVM xpr@(Var name _) = do
+                                variables <- ask
+                                case variables Map.!? name of
+                                    Just v  -> pure v
+                                    Nothing -> error "Undefined variable."
+                                -- where
+                                --     variables = ask 
+-- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
+fromExprsToLLVM expr    = error "Invalid"
+
+{-
+|   @fromAssignToLLVM
+|   transform Assign expr into a LLVM assignation
+-}
+
+{-
+|   @fromBinOpToLLVM
+|   BinOp transformation from Expr to LLVM ast using LLVM instr (changing instr in function of type and op)
+-}
+fromBinOpToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromBinOpToLLVM (BinOp op xp1 xp2 xtype)   = do
     op1 <- fromValToLLVM xp1 xtype
     op2 <- fromValToLLVM xp2 xtype
     tmp <- instr op1 op2
@@ -109,8 +134,10 @@ fromExprsToLLVM (BinOp op xp1 xp2 xtype)   = do
                                     _           -> error "Invalid type for binOP"
                 _       -> error "Invalid op"
 
-fromExprsToLLVM expr    = error "Invalid"
-
+{-
+|   @fromValToLLVM
+|   transform a Val Expr into a LLVM ConstantOperand
+-}
 fromValToLLVM :: Expr -> ExprType -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromValToLLVM (Val vx vtype) ExprDouble     | vtype == ExprDouble   = pure $ ConstantOperand (Float (Double xd))
                                             | vtype == ExprInt      = pure $ ConstantOperand (Float (Double (fromIntegral xi)))
