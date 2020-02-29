@@ -38,6 +38,8 @@ import LLVM.CodeModel
 
 type Binds = Map.Map String Operand
 
+
+
 fromASTToLLVM :: Expr -> ModuleBuilder Operand
 -- fromASTToLLVM (Function nameS paramsS@(x:xs) body type) = do
 --     let name = fromString nameS
@@ -133,6 +135,25 @@ fromBinOpToLLVM (BinOp op xp1 xp2 xtype)   = do
                                     ExprDouble  -> (fcmp ONE)
                                     _           -> error "Invalid type for binOP"
                 _       -> error "Invalid op"
+--
+fromExprsToLLVM expr@(If _ _ _ _) = mdo
+    _ifB RecursiveDo block `named` "if"
+    let zero = ConstantOperand (Float (Double 0))
+    condV <- fromValToLLVM cond (getTypefromExpr cond)
+    cmp <- fcmp ONE zero condV `named` "cmp"
+
+    condBr cmp thenB elseB
+
+    thenB <- block `named` "then"
+    thenOp <- fromValToLLVM thenexpr (getTypefromExpr thenexpr)
+    br mergeB
+
+    elseB <- block `named` "else"
+    elseOp <- fromValToLLVM elsexpr (getTypefromExpr elsexpr)
+    br mergeB
+
+    mergeB <- block `named` "ifcont"
+    phi [(thenOp, thenB), (elseOp, elseB)]
 
 {-
 |   @fromValToLLVM
