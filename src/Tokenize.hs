@@ -17,7 +17,9 @@ data Op = Plus
         | Div
         | Mod
         | Inf
+        | InfEq
         | Sup
+        | SupEq
         | Eq
         | Not
         | Dif
@@ -101,7 +103,9 @@ stringToToken s@(x:xs)  | x == '(' = TokenOpen                  : stringToToken 
                         | x == '<' = TokenOp Inf                : stringToToken xs
                         | x == '>' = TokenOp Sup                : stringToToken xs
                         | x == '/' = TokenOp Div                : stringToToken xs
+                        | x == '%' = TokenOp Mod                : stringToToken xs
                         | x == '^' = TokenOp Power              : stringToToken xs
+                        | x == ':' = TokenType                  : stringToToken xs
                         | x == ';' = TokenComa                  : stringToToken xs
                         | x == '\''= Value (ValueChar (head xs)): stringToToken (tail (tail xs))
                         | x == ',' = TokenSep                   : stringToToken xs

@@ -30,10 +30,21 @@ data Expr   = Var       String                          ExprType
             | Function  String  [Expr]  Expr            ExprType
             | BinOp     Op      Expr    Expr            ExprType
             | If        Expr    Expr    (Maybe Expr)    ExprType
-            | For       String  Expr    Expr    Expr    ExprType
+            | For       Expr    Expr    Expr    Expr    ExprType
             | List      [Expr]                          ExprType
             | Ast       [Expr]                          ExprType
             deriving (Show, Eq)
+
+getTypeFromTypeName :: Expr -> ExprType
+getTypeFromTypeName (Var name _)    | name == "int"     = ExprInt
+                                    | name == "double"  = ExprDouble
+                                    | name == "void"    = None
+                                    | name == "bool"    = ExprBool
+                                    | name == "char"    = ExprChar
+                                    | name == "string"  = ExprString
+                                    | otherwise         = error "Bad type declared"
+--
+getTypeFromTypeName   _                                 = error "Type should be a name"
 
 setTypeExpr :: Expr -> ExprType -> Expr
 setTypeExpr (Var       x        _)  typage = Var       x        typage  
@@ -83,7 +94,15 @@ parseUnOp Minus tokens = case parseExpr tokens of
 parseUnOp _ _          = error "Bad Unop symbol"
 
 parseFor :: Parser Expr
-parseFor tokens = Nothing
+parseFor tokens = case parseExpr tokens of
+    Just (x, TokenSep:xs)   -> case parseExpr xs of
+        Just (y, TokenSep:ys)   -> case parseExpr ys of
+            Just (z, Word "in":zs)  -> case parseExpr zs of
+                Just (final, restoks) -> Just (For x y z final (getTypefromExpr x), restoks)
+                _                     -> error "Bad in parsing for expr"
+            _                     -> error "Bad third sep parsing for expr"
+        _                     -> error "Bad second sep parsing for expr"
+    _                     -> error "Bad first sep parsing for expr"
 
 parseIf :: Parser Expr
 parseIf tokens = case parseExpr tokens of 
@@ -102,6 +121,29 @@ parseAssign :: Expr -> Parser Expr
 parseAssign name tokens = case parseExpr tokens of
     Just (x, tokens)    -> Just (Assign (setTypeExpr name (getTypefromExpr x)) x (getTypefromExpr x), tokens)
 
+parseAPrototype :: Parser Expr
+parseAPrototype tok = case parseValue tok of
+    Just ((Var n _), TokenType:xs) -> case parseValue xs of
+        Just (y, ys) -> Just (Var n (getTypeFromTypeName y), ys)
+
+parsePrototype :: [Expr] ->  Parser [Expr]
+parsePrototype tab (TokenOpen:xs)   =  case parseAPrototype xs of
+    Just (expr, toks@(TokenClose: xs))      -> Just (tab ++ [expr], xs)
+    Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) xs
+    _                                       -> Nothing
+parsePrototype tab (Word n:xs)      = case parseAPrototype xs of
+    Just (expr, toks@(TokenClose: xs))      -> Just (tab ++ [expr], xs)
+    Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) xs
+    _                                       -> Nothing  
+parsePrototype _ _ = error "Bad parsing into prototype" 
+
+
+parseDef :: Parser Expr
+parseDef tokens = case parseExpr tokens of
+    Just ((Var name _), xs) -> case parsePrototype [] xs of
+        Just (proto, (TokenType:ys)) -> case parseValue ys of
+            Just (x, rest) -> case parseExpr rest of
+                Just (z, zs) -> Just (Function name proto z (getTypeFromTypeName x), zs)
 {-
 Parse an expresion value
 -}
@@ -112,9 +154,10 @@ parseValue (TokenOpen : xs)     = case parseExpr xs of
     Nothing                         -> error "Parse Value return nothing when token open is detected"
 parseValue (TokenOp op: xs)     = parseUnOp op xs
 --
-parseValue (Word n:xs)  -- | n == "for" = parseFor xs
+parseValue (Word n:xs)  | n == "for"    = parseFor xs
                         | n == "if"     = parseIf xs
                         | n == "while"  = parseWhile xs
+                        | n == "def"    = parseDef xs
                         | otherwise     = Just ((Var n None), xs)
             --
 -- Error for parsing the value
