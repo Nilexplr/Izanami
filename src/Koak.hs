@@ -48,27 +48,40 @@ runKoak isPrompt content = do
                                 ast <- runReaderT (buildModuleT "main" prompt) env
                                 return ()
                             else do
+                                writeFile "temp.bs" ""
                                 let env = JITEnv ctx compLayer mdlKey
-                                ast <- runReaderT (buildModuleT "main" (compileKoak content)) env
+                                ast <- runReaderT (buildModuleT "main" (compileKoak (createAst (stringToToken content)))) env
+                                system "llc temp.bs && gcc -c temp.bs.s -o file.o && gcc file.o main.o -o a.out && rm -f temp.bs temp.bs.s file.o || echo ERROR"
                                 return ()
 
 symResolver :: MangledSymbol -> IO (Either JITSymbolError JITSymbol)
 symResolver sym = undefined
 
-compileKoak :: String -> ModuleBuilderT (ReaderT JITEnv IO) ()
-compileKoak str = do
+compileKoak :: Expr -> ModuleBuilderT (ReaderT JITEnv IO) ()
+compileKoak (Ast astXpr@(x@(Function _ _ _ _):[]) _)        = appendCompileFile x
+compileKoak (Ast astXpr@(x@(Function _ _ _ _):xs) atype)    = do
+    appendCompileFile x
+    compileKoak (Ast xs atype)
+compileKoak (Ast astXpr@(x@(Extern _ _ _):[]) _)            = appendCompileFile x
+compileKoak (Ast astXpr@(x@(Extern _ _ _):xs) atype)        = do
+    appendCompileFile x
+    compileKoak (Ast xs atype)
+compileKoak (Ast astXpr@(x:[]) atype)                       = appendCompileFile (Ast astXpr (getTypefromExpr x))
+
+
+appendCompileFile :: Expr -> ModuleBuilderT (ReaderT JITEnv IO) ()
+appendCompileFile x = do
     -- Uncomment for print AST:
-    -- liftIO $ print $ createAst $ stringToToken str
-    anon <- isAnonExpr <$> hoist (fromASTToLLVM $ createAst $ stringToToken str)
+    -- liftIO $ print $ x
+    anon <- isAnonExpr <$> hoist (fromASTToLLVM x)
     def <- mostRecentDef
     ast <- moduleSoFar "main"
     ctx <- lift $ asks jitEnvContext
     env <- lift ask
     liftIO $ withModuleFromAST ctx ast $ \mdl -> do
         -- Uncomment for print LLVM code:
-        -- Text.hPutStrLn stderr $ ppll def
-        writeFile "temp.bs" (unpack (ppll def))
-        system "llc temp.bs && gcc -c temp.bs.s -o file.o && gcc file.o main.o -o a.out && rm -f temp.bs temp.bs.s file.o || echo ERROR"
+        Text.hPutStrLn stderr $ ppll def
+        appendFile "temp.bs" (unpack (ppll def))
         -- let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
         -- this returns true if the module was modified
         -- withPassManager spec $ flip runPassManager mdl
@@ -113,4 +126,5 @@ prompt = do
         isAnonExpr _ = False
         jit env mdl xtype = case xtype of
                                 ExprInt     -> jiti env mdl
+                                None        -> jiti env mdl
                                 -- ExprDouble  -> jitd env mdl
