@@ -5,10 +5,9 @@
 ** main
 */
 
-double __anon_expr();
+int __anon_expr();
 
 int main()
 {
-    double ret = (double)__anon_expr();
+    int ret = (int)__anon_expr();
     return((int)ret);
-}
