@@ -3,11 +3,14 @@ module Parser
     , ValueType(..)
     , createAst
     , ExprType(..)
+    , getTypefromExpr
     )
     where
 
+
 import Tokenize
 import Data.Data
+import Data.List
 
 type Parser a = [Token] -> Maybe(a, [Token])
 
@@ -68,7 +71,7 @@ typeValueToExpr (ValueInt    x) = ExprInt
 getTypefromExpr :: Expr -> ExprType
 getTypefromExpr (Var       _        exprtype)   = exprtype 
 getTypefromExpr (Val       _        exprtype)   = exprtype 
-getTypefromExpr (UnaryOp   Not _    exprtype)   = ExprBool 
+getTypefromExpr (UnaryOp   Not _    exprtype)   = exprtype 
 getTypefromExpr (UnaryOp   op _     exprtype)   = exprtype
 getTypefromExpr (Call      _ _      exprtype)   = exprtype 
 getTypefromExpr (While     _ _      exprtype)   = exprtype 
@@ -129,6 +132,7 @@ parseAPrototype tok = case parseValue tok of
     Just (x, xs) -> Just (x, xs)
 
 parsePrototype :: [Expr] ->  Parser [Expr]
+parsePrototype tab toks@(TokenOpen:(TokenClose:ys)) = Just ([], ys)
 parsePrototype tab (TokenOpen:xs)   =  case parseAPrototype xs of
     Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
     Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) toks
@@ -136,6 +140,17 @@ parsePrototype tab (TokenOpen:xs)   =  case parseAPrototype xs of
 parsePrototype tab tokens           = case parseAPrototype tokens of
     Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
     Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) toks
+    _                                       -> Nothing  
+
+parseArgs :: [Expr] ->  Parser [Expr]
+parseArgs tab toks@(TokenOpen:(TokenClose:ys)) = Just ([], ys)
+parseArgs tab (TokenOpen:xs)   =  case parseAPrototype xs of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks@(TokenSep: ys))        -> parseArgs (tab ++ [expr]) ys
+    _                                       -> Nothing
+parseArgs tab tokens           = case parseAPrototype tokens of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks@(TokenSep: ys))        -> parseArgs (tab ++ [expr]) ys
     _                                       -> Nothing  
 
 
@@ -148,13 +163,14 @@ parseDef tokens = case parseValue tokens of
 
 
 parseCall :: String -> Parser Expr
-parseCall name toks = case parsePrototype [] toks of
+parseCall name toks = case parseArgs [] toks of
     Just (xprs, rest)   -> Just (Call name xprs None, rest) 
 
 parseExtern :: Parser Expr
 parseExtern toks = case parseValue toks of
     Just ((Var name _), xs) -> case parsePrototype [] xs of
-        Just (xprs, rest)   -> Just (Extern name xprs None, rest) 
+        Just (xprs, (TokenType:ys)) -> case parseValue ys of
+            Just (x, rest) -> Just (Extern name xprs (getTypeFromTypeName x), rest) 
                 
 {-
 Parse an expresion value
@@ -178,7 +194,7 @@ parseValue x = error ("Token not recognize" ++ (show x))
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
-    Just (x, toks)      -> Just (BinOp op previousExpr x None, toks)  
+    Just (x, toks)      -> Just (BinOp op previousExpr x (getTypefromExpr x), toks)  
     _                   -> Nothing
 
 parseExpr :: Parser Expr
@@ -204,6 +220,16 @@ parseExprs list tokens =
     -- Error during the parsing    
     _                                       -> Nothing
 
+findExprType :: [(String, ExprType)] -> String -> ExprType
+findExprType a s = case find (\(k, _) -> s == s) (reverse a) of
+    Just (_, e) -> e
+    Nothing -> None 
+
+specialTypeCall :: [(String, ExprType)] -> [Expr] -> [Expr]
+specialTypeCall tab (expr@(Function name _ _ xtype):xs) = expr : specialTypeCall (tab ++ [(name, xtype)]) xs
+specialTypeCall tab (expr@(Call name _  _):xs) = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
+specialTypeCall tab (x:xs)  = x : specialTypeCall tab xs
+specialTypeCall tab []  = []
 
 {-
 Launch the expression's parsing instance
@@ -211,5 +237,5 @@ Launch the expression's parsing instance
 createAst :: [Token] -> Expr
 createAst [] = Ast [] None
 createAst tokens = case parseExprs [] tokens of
-    Just (result, [])   -> Ast result None
+    Just (result, [])   -> Ast (specialTypeCall [] result) None
     _                   -> error "bad parsing"

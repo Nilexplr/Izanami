@@ -21,6 +21,14 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- llvm-hs-pure
+- transformers
+- containers
+- text
+- llvm-hs-pretty
+- llvm-hs      >= 9.0 && < 10.0
+- bytestring
+- process
 
 library:
   source-dirs: src

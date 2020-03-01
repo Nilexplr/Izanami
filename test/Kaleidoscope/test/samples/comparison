@@ -1,0 +1,2 @@
+result = 0;
+if 1 == 1 then result = 1 else result = 2;

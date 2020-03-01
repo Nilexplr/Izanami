@@ -10,6 +10,7 @@ module Tokenize
     where
 
 import Data.Char
+import Control.Monad.Trans.Reader
 
 data Op = Plus
         | Minus
@@ -129,5 +130,3 @@ stringToToken ('=':x)   | x == []       = error "Invalid assignation during Toke
                         | head x == '=' = TokenOp Eq      : (stringToToken $ tail x)
                         | otherwise     = TokenAssign  : stringToToken x
 stringToToken _ = error "Invalid character"
-
-
