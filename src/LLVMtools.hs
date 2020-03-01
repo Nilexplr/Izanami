@@ -39,20 +39,16 @@ import LLVM.CodeModel
 type Binds = Map.Map String Operand
 
 fromASTToLLVM :: Expr -> ModuleBuilder Operand
-fromASTToLLVM (Function nameS paramsS@(x:xs) fbody ftype) = do
+fromASTToLLVM (Ast ((Function nameS paramsS@(x:xs) fbody ftype):ys) _) = do
     let name = fromString nameS
     case ftype of
-        ExprDouble -> function name params Type.double $ \ops -> do
+        ExprDouble  -> function name params Type.double $ \ops -> do
+            let variables = Map.fromList (zip (varToString <$> paramsS) ops)
+            flip runReaderT variables $ fromExprsToLLVM fbody >>= ret
+        ExprInt     -> function name params Type.i32 $ \ops -> do
             let variables = Map.fromList (zip (varToString <$> paramsS) ops)
             flip runReaderT variables $ fromExprsToLLVM fbody >>= ret
         where params = createParam <$> paramsS
-
--- buildAST (Function (Prototype nameStr paramStrs) body) = do
---   let n = fromString nameStr
---   function n params Type.double $ \ops -> do
---     let binds = Map.fromList (zip paramStrs ops)
---     flip runReaderT binds $ buildExpr body >>= ret
---   where params = zip (repeat Type.double) (map fromString paramStrs)
 
 -- buildAST (Extern (Prototype nameStr params)) =
 --   extern (fromString nameStr) (replicate (length params) Type.double) Type.double
@@ -76,6 +72,7 @@ createParam (Var name ptype)    | ptype == ExprInt      = (Type.i32, fromString 
                                 | ptype == ExprDouble   = (Type.double, fromString name)
                                 | otherwise             = error "Invalid parrameter type"
 createParam _   = error "Invalid parrameter" 
+
 {-
 |   @fromExprsToLLVM
 |   transform an Expr into a LLVM AST
@@ -83,13 +80,42 @@ createParam _   = error "Invalid parrameter"
 fromExprsToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromExprsToLLVM xpr@(BinOp _ _ _ _)         = fromBinOpToLLVM xpr
 fromExprsToLLVM xpr@(Val _ xtype)           = fromValToLLVM xpr xtype
-fromExprsToLLVM xpr@(Var name _) = do
-                                variables <- ask
-                                case variables Map.!? name of
-                                    Just v  -> pure v
-                                    Nothing -> error "Undefined variable."
+fromExprsToLLVM xpr@(Call _ _ _)            = fromCallToLLVM xpr
+fromExprsToLLVM xpr@(Var name _)            = do
+                                            variables <- ask
+                                            case variables Map.!? name of
+                                                Just v  -> pure v
+                                                Nothing -> error "Undefined variable."
 -- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
 fromExprsToLLVM expr    = error "Invalid"
+
+{-
+|   @fromCallToLLVM
+|   transform Call expr into a LLVM function call
+-}
+fromCallToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromCallToLLVM (Call name paramsExpr ctype) = do
+                                            params <- mapM fromExprsToLLVM paramsExpr
+                                            let funcName    = fromString name
+                                                ty          = FunctionType Type.double (exprTypeToType <$> (getTypefromExpr <$> paramsExpr)) False
+                                                ptrTy       = Type.PointerType ty (AddrSpace 0)
+                                                ref         = GlobalReference ptrTy funcName
+                                            call (ConstantOperand ref) (zip params (repeat []))
+fromCallToLLVM xpr = error ("Bad call : " ++ show xpr)
+
+{-
+|   @exprTypeToType
+|   turn an ExprType to a Type
+-}
+exprTypeToType :: ExprType -> Type
+exprTypeToType ExprInt      = Type.i32
+exprTypeToType ExprDouble   = Type.double
+
+{-
+|   @exprToFirstClass
+|   turn an expr to a First Class
+-}
+
 
 {-
 |   @fromAssignToLLVM

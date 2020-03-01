@@ -1,0 +1,112 @@
+Right (
+    Context {
+        line = 2,
+        cols = 23,
+        content = ""
+    },
+    Stmt [
+        Kdefs (
+            Defs (
+                Prototype (
+                    Symbol "test"
+                    )
+                    (
+                        ProtoArgs [
+                            ("x","double")
+                        ]
+                        "double"
+                    )
+                )
+                (
+                    Exprs [
+                        Expr (
+                            Unary (
+                                Right (
+                                    Postfix (
+                                        Symbol "x"
+                                    )
+                                    Nothing
+                                )
+                            )
+                        )
+                        [
+                            (
+                                "+",
+                                Unary (
+                                    Right (
+                                        Postfix (
+                                            MyFloat 2.0
+                                        )
+                                        Nothing
+                                    )
+                                )
+                            )
+                        ]
+                    ]
+                )
+        ),
+        Exprs [
+            Expr (
+                Unary (
+                    Right (
+                        Postfix (
+                            Symbol "test"
+                        )
+                        (
+                            Just (
+                                Callexpr [
+                                    Expr (
+                                        Unary (
+                                            Right (
+                                                Postfix (
+                                                    MyFloat 5.0
+                                                )
+                                                Nothing
+                                            )
+                                        )
+                                    )
+                                    []
+                                ]
+                            )
+                        )
+                    )
+                )
+            )
+            [
+                (
+                    "-",
+                    Unary (
+                        Right (
+                            Postfix (
+                                MyInt 2
+                            )
+                            Nothing
+                        )
+                    )
+                ),
+                (
+                    "*",
+                    Unary (
+                        Right (
+                            Postfix (
+                                MyInt 3
+                            )
+                            Nothing
+                        )
+                    )
+                ),
+                (
+                    "+",
+                    Unary (
+                        Right (
+                            Postfix (
+                                MyInt 1
+                            )
+                            Nothing
+                        )
+                    )
+                )
+            ]
+        ]
+    ]
+)

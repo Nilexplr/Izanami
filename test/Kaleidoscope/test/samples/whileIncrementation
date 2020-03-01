@@ -1,0 +1,2 @@
+myVar = 0;
+while myVar < 5 do myVar = myVar + 1;

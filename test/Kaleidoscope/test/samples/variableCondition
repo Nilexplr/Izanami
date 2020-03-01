@@ -1,0 +1,4 @@
+myVar = 4;
+myVar2 = 5;
+result = 0;
+if myVar > myVar2 then result = 1 else result = 2;

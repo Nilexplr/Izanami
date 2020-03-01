@@ -1,0 +1,3 @@
+def _(myVar : int) : void myVar + 2;
+myVar2 = 3;
+_myVar;

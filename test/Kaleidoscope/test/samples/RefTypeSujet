@@ -1,0 +1,26 @@
+type=none, value=AST:(
+    type=none, value=def:(
+        type=double->double value=test:(
+            type=none, value=args:(type=double, value=x)
+            type=double, value=instructions:(
+                type=double->double->double, value=+:(
+                    type=double value=x,
+                    type=double, value=2.0
+                )
+            )
+        )
+    )
+    type=double value=instructions:(
+        type=double->integer->double value=+:(
+            type=double->integer->double value=-:(
+                type=double->double value=test:(
+                    type=double, value=5.0
+                ),
+                type=integer->integer->integer value =*:(
+                    type=integer value=2, type=integer value=3
+                )
+            ),
+            type=integer, value=1
+        )
+    )
+)
