@@ -20,9 +20,9 @@ import LLVM.AST.Constant
 import LLVM.AST.Float
 import LLVM.AST.FloatingPointPredicate hiding (False, True)
 import qualified LLVM.AST.IntegerPredicate as Sicmp
-import LLVM.AST.Operand
+import LLVM.AST.Operand as Op
 import LLVM.AST.Type as Type
-import LLVM.IRBuilder
+import LLVM.IRBuilder as IRB
 import LLVM.Module
 import LLVM.PassManager
 import LLVM.Pretty
@@ -265,14 +265,14 @@ fromExprsToLLVM (xpr@(Call _ _ _):[])       = fromCallToLLVM xpr
 fromExprsToLLVM (expr@(If _ _ _ _):[])      = fromIfToLLVM expr
 fromExprsToLLVM (expr@(For _ _ _ _ _):[])   = fromForToLLVM expr
 fromExprsToLLVM (expr@(While _ _ _):[])     = fromWhileToLLVM expr
+fromExprsToLLVM (xpr@(Assign _ _ _):[])     = fromAssignToLLVM xpr
 fromExprsToLLVM (expr@(List xp1 xp2 _):[])  = do
                                         fromExprsToLLVM [xp1]
                                         fromExprsToLLVM [xp2]
 fromExprsToLLVM (xpr@(Var name _):[])       = do
-                                        variables <- ask
-                                        case variables Map.!? name of
-                                            Just v  -> pure v
-                                            Nothing -> error "Undefined variable."
+                                        let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
+                                        load var 8
+                                           -- Nothing -> error ("Undefined variable.\nVariables : " ++ show variables ++ "\nname :" ++ show name)
 fromExprsToLLVM (xpr@(BinOp _ _ _ _):xs)    = do
                                         fromBinOpToLLVM xpr
                                         fromExprsToLLVM xs
@@ -299,9 +299,11 @@ fromExprsToLLVM (xpr@(Var name _):xs)       = do
                                         variables <- ask
                                         case variables Map.!? name of
                                             Just v  -> pure v
-                                            Nothing -> error "Undefined variable."
+                                            --Nothing -> error ("Undefined variable. " ++ show variables)
                                         fromExprsToLLVM xs
--- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
+fromExprsToLLVM (xpr@(Assign _ _ _):xs)     = do
+                                        fromAssignToLLVM xpr
+                                        fromExprsToLLVM xs
 fromExprsToLLVM expr    = error ("Invalid expr " ++ (show expr))
 
 {-
@@ -342,6 +344,15 @@ exprTypeToType ExprDouble   = Type.double
 |   @fromAssignToLLVM
 |   transform Assign expr into a LLVM assignation
 -}
+fromAssignToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromAssignToLLVM (Assign (Var nameS _) xpr xtype)    = do
+                                                let vtype = exprTypeToType xtype
+                                                val <- fromExprsToLLVM [xpr]
+                                                ptr <- alloca vtype (Just $ ConstantOperand (Int 128 4)) (8 :: Word32) `named` (fromString nameS)
+                                                let tmp = Map.insert nameS ptr
+                                                store ptr 8 val
+                                                retn <- load ptr 8
+                                                return retn
 
 {-
 |   @fromBinOpToLLVM
@@ -432,4 +443,6 @@ fromValToLLVM (Val vx vtype) ExprInt        | vtype == ExprInt      = pure $ Con
                                                                             xi = case vx of
                                                                                 ValueInt y -> y
                                                                                 _ -> error "Incompatible type"
+fromValToLLVM (Val (ValueBool vx) vty) ExprBool | vx == False       = pure $ ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))
+                                                | vx == True        = pure $ ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 1))  
 fromValToLLVM x _ = fromExprsToLLVM [x]
