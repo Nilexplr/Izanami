@@ -50,6 +50,7 @@ runKoak isPrompt content = do
                             else do
                                 writeFile "temp.bs" ""
                                 let env = JITEnv ctx compLayer mdlKey
+                                print $ (createAst (stringToToken content))
                                 ast <- runReaderT (buildModuleT "main" (compileKoak (createAst (stringToToken content)))) env
                                 system "llc temp.bs && gcc -c -g3 temp.bs.s -o file.o && gcc file.o main.o -o a.out || rm -f temp.bs temp.bs.s file.o || echo ERROR"
                                 return ()
