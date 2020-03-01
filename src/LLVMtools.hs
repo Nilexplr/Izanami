@@ -269,13 +269,17 @@ fromExprsToLLVM (xpr@(Assign _ _ _):[])     = fromAssignToLLVM xpr
 fromExprsToLLVM (expr@(List xp1 xp2 _):[])  = do
                                         fromExprsToLLVM [xp1]
                                         fromExprsToLLVM [xp2]
-fromExprsToLLVM (xpr@(Var name _):[])       = do
+fromExprsToLLVM (xpr@(Var name xtp):[])       = do
                                         variables <- ask
                                         case variables Map.!? name of
                                             Just v -> pure v
-                                            Nothing -> do
-                                                let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
-                                                load var 8
+                                            Nothing -> if xtp == ExprDouble 
+                                                then do
+                                                    let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
+                                                    load var 8
+                                                else do 
+                                                    let var = LocalReference (Type.PointerType Type.i32 (AddrSpace 0)) (AST.Name $ fromString name)
+                                                    load var 8
 fromExprsToLLVM (xpr@(BinOp _ _ _ _):xs)    = do
                                         fromBinOpToLLVM xpr
                                         fromExprsToLLVM xs
@@ -298,13 +302,15 @@ fromExprsToLLVM (expr@(List xp1 xp2 _):xs)  = do
                                         fromExprsToLLVM [xp1]
                                         fromExprsToLLVM [xp2]
                                         fromExprsToLLVM xs
-fromExprsToLLVM (xpr@(Var name _):xs)       = do
+fromExprsToLLVM (xpr@(Var name xtp):xs)       = do
                                         variables <- ask
                                         case variables Map.!? name of
                                             Just v -> pure v
-                                            Nothing -> do
+                                            Nothing -> if xtp == ExprDouble then do
                                                 let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
                                                 load var 8
+                                                else do let var = LocalReference (Type.PointerType Type.i32 (AddrSpace 0)) (AST.Name $ fromString name)
+                                                        load var 8
                                             --Nothing -> error ("Undefined variable. " ++ show variables)
                                         fromExprsToLLVM xs
 fromExprsToLLVM (xpr@(Assign _ _ _):xs)     = do

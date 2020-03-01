@@ -235,6 +235,8 @@ specialTypeArgument _ = error "Bad call of the specialTypeArgument function"
 
 specialTypeCall :: [(String, ExprType)] -> [Expr] -> [Expr]
 specialTypeCall tab (expr@(Function name _ _ xtype):xs) = expr : specialTypeCall (tab ++ [(name, xtype)]) xs
+specialTypeCall tab (expr@(Assign (Var name _) _ xtype):xs) = expr : specialTypeCall (tab ++ [(name, xtype)]) xs
+specialTypeCall tab (expr@(Var name xtype):xs) = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
 specialTypeCall tab (expr@(Call name _  _):xs) = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
 specialTypeCall tab (x:xs)  = x : specialTypeCall tab xs
 specialTypeCall tab []  = []
