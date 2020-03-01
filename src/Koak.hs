@@ -115,7 +115,7 @@ prompt = do
                 let spec = defaultCuratedPassSetSpec { optLevel = Just 3 }
                 -- this returns true if the module was modified
                 withPassManager spec $ flip runPassManager mdl
-                when anon (jit env mdl xtype >>= hPrint stderr)
+                when anon (if xtype == ExprDouble then (jitd env mdl >>= hPrint stderr) else (jiti env mdl >>= hPrint stderr))
             when anon (removeDef def)
             prompt
     where
@@ -124,7 +124,3 @@ prompt = do
             | otherwise = ioError e
         isAnonExpr (ConstantOperand (GlobalReference _ "__anon_expr")) = True
         isAnonExpr _ = False
-        jit env mdl xtype = case xtype of
-                                ExprInt     -> jiti env mdl
-                                None        -> jiti env mdl
-                                -- ExprDouble  -> jitd env mdl
