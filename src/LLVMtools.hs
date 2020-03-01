@@ -270,9 +270,12 @@ fromExprsToLLVM (expr@(List xp1 xp2 _):[])  = do
                                         fromExprsToLLVM [xp1]
                                         fromExprsToLLVM [xp2]
 fromExprsToLLVM (xpr@(Var name _):[])       = do
-                                        let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
-                                        load var 8
-                                           -- Nothing -> error ("Undefined variable.\nVariables : " ++ show variables ++ "\nname :" ++ show name)
+                                        variables <- ask
+                                        case variables Map.!? name of
+                                            Just v -> pure v
+                                            Nothing -> do
+                                                let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
+                                                load var 8
 fromExprsToLLVM (xpr@(BinOp _ _ _ _):xs)    = do
                                         fromBinOpToLLVM xpr
                                         fromExprsToLLVM xs
@@ -296,8 +299,12 @@ fromExprsToLLVM (expr@(List xp1 xp2 _):xs)  = do
                                         fromExprsToLLVM [xp2]
                                         fromExprsToLLVM xs
 fromExprsToLLVM (xpr@(Var name _):xs)       = do
-                                        let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
-                                        load var 8
+                                        variables <- ask
+                                        case variables Map.!? name of
+                                            Just v -> pure v
+                                            Nothing -> do
+                                                let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
+                                                load var 8
                                             --Nothing -> error ("Undefined variable. " ++ show variables)
                                         fromExprsToLLVM xs
 fromExprsToLLVM (xpr@(Assign _ _ _):xs)     = do
