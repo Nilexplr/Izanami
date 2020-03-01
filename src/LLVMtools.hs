@@ -41,6 +41,11 @@ import Numeric
 
 type Binds = Map.Map String Operand
 
+-- fromAssignToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+-- fromAssignToLLVM (Assign (Var name nameType) body xtype) = do
+--     Map.insert name (fromExprsToLLVM body `named` "var")
+--     return $ ConstantOperand (Int (fromInteger (fromIntegral 32)) (fromIntegral 0))
+
 fromWhileToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromWhileToLLVM (While cond body ExprDouble) = mdo 
     preheaderB <- block `named` "preheader"
@@ -221,6 +226,7 @@ fromExprsToLLVM xpr@(Var name _) = do
 fromExprsToLLVM expr@(If _ _ _ _)           = fromIfToLLVM expr
 fromExprsToLLVM expr@(For _ _ _ _ _)        = fromForToLLVM expr
 fromExprsToLLVM expr@(While _ _ _)          = fromWhileToLLVM expr
+-- fromExprsToLLVM expr@(Assign _ _ _)         = fromAssignToLLVM expr
 fromExprsToLLVM expr    = error ("Invalid" ++ show expr)
 
 {-
