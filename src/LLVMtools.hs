@@ -71,7 +71,10 @@ fromWhileToLLVM (While cond body ExprInt) = mdo
     -- default to 1 if there's no step defined
     let zero = ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))
     -- again we need 'i' in the bindings
-    condV <- (fromExprsToLLVM cond >>= icmp Sicmp.NE zero) `named` "cond"
+    let checkCond = case cond of 
+            Val (ValueInt n) _  -> (icmp Sicmp.NE zero (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n))))
+            _                   -> (fromExprsToLLVM cond >>= icmp Sicmp.NE zero)
+    condV <- checkCond `named` "cond"
     condBr condV loopB afterB
     afterB <- block `named` "after"
     -- since a for loop doesn't really have a value, return 0
