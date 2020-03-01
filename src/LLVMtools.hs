@@ -296,9 +296,8 @@ fromExprsToLLVM (expr@(List xp1 xp2 _):xs)  = do
                                         fromExprsToLLVM [xp2]
                                         fromExprsToLLVM xs
 fromExprsToLLVM (xpr@(Var name _):xs)       = do
-                                        variables <- ask
-                                        case variables Map.!? name of
-                                            Just v  -> pure v
+                                        let var = LocalReference (Type.PointerType Type.double (AddrSpace 0)) (AST.Name $ fromString name)
+                                        load var 8
                                             --Nothing -> error ("Undefined variable. " ++ show variables)
                                         fromExprsToLLVM xs
 fromExprsToLLVM (xpr@(Assign _ _ _):xs)     = do
@@ -353,6 +352,21 @@ fromAssignToLLVM (Assign (Var nameS _) xpr xtype)    = do
                                                 store ptr 8 val
                                                 retn <- load ptr 8
                                                 return retn
+
+{-
+|   @fromUnaryOpToLLVM
+|   UnaryOp transformation from Expr to LLVM ast using LLVM instr
+-}
+fromUnaryOpToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromUnaryOpToLLVM (UnaryOp op xp xtype) = do
+    op0 <- fromValToLLVM xp xtype
+    case op of
+        Not -> do 
+            tmp <- fromValToLLVM (Val (ValueBool True) ExprBool) ExprBool
+            xorret <- xor tmp op0
+            case xtype of
+                ExprDouble -> uitofp xorret Type.double
+                otherwithe -> xor tmp op0
 
 {-
 |   @fromBinOpToLLVM
