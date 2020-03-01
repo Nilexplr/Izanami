@@ -151,10 +151,12 @@ fromIfToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromIfToLLVM (If cond thenexpr (Just elsexpr) xtype)= mdo
     ifB <- block `named` "if"
 
-    let zero = ConstantOperand (Float (Double 0))
-    condV <- fromExprsToLLVM cond
-    cmp <- fcmp ONE zero condV `named` "cmp"
-
+    let condV = if xtype == ExprDouble then (fromExprsToLLVM cond >>= fcmp ONE (ConstantOperand (Float (Double 0)))) 
+                    else case cond of 
+                        Val (ValueInt n) _  -> (icmp Sicmp.NE (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))) (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n))))
+                        _                   -> (fromExprsToLLVM cond >>= icmp Sicmp.NE (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))))
+    
+    cmp <- condV `named` "cmp"
     condBr cmp thenB elseB
 
     thenB <- block `named` "then"
