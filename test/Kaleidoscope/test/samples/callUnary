@@ -1,2 +1,0 @@
-def _(myVar : int) : void myVar + 2;
-_2;
