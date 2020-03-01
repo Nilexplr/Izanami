@@ -1,2 +1,0 @@
-def $(myVar : int, myVar2 : int) : void myVar + 2;
-4 $ 1;

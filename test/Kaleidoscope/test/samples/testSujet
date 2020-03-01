@@ -1,2 +1,0 @@
-def test(x : double) : double x + 2.0;
-test(5.0) - 2 * 3 + 1;

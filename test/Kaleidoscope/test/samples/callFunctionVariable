@@ -1,3 +1,0 @@
-def myFunc(myVar : int) : void myVar = myVar + 2;
-myVar2 = 0;
-myFunc(myVar2);
