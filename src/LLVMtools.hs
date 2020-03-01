@@ -39,9 +39,14 @@ import LLVM.CodeModel
 type Binds = Map.Map String Operand
 
 fromASTToLLVM :: Expr -> ModuleBuilder Operand
--- fromASTToLLVM (Function nameS paramsS@(x:xs) body type) = do
---     let name = fromString nameS
---     function name 
+fromASTToLLVM (Function nameS paramsS@(x:xs) fbody ftype) = do
+    let name = fromString nameS
+    case ftype of
+        ExprDouble -> function name params Type.double $ \ops -> do
+            let variables = Map.fromList (zip (varToString <$> paramsS) ops)
+            flip runReaderT variables $ fromExprsToLLVM fbody >>= ret
+        where params = createParam <$> paramsS
+
 -- buildAST (Function (Prototype nameStr paramStrs) body) = do
 --   let n = fromString nameStr
 --   function n params Type.double $ \ops -> do
@@ -55,6 +60,23 @@ fromASTToLLVM (Ast (x:xs) xtype) = function "__anon_expr" [] Type.double $
     const $ flip runReaderT mempty $ fromExprsToLLVM x >>= ret
 
 {-
+|   @varToString
+|   take a Var and return his name
+-}
+varToString :: Expr -> String
+varToString (Var name _)    = name
+varToString _               = error "Invalid var"
+
+{-
+|   @createParam
+|   take the Expr param and return a tuple with the type and the name of the param
+-}
+createParam :: Expr -> (Type, ParameterName)
+createParam (Var name ptype)    | ptype == ExprInt      = (Type.i32, fromString name)
+                                | ptype == ExprDouble   = (Type.double, fromString name)
+                                | otherwise             = error "Invalid parrameter type"
+createParam _   = error "Invalid parrameter" 
+{-
 |   @fromExprsToLLVM
 |   transform an Expr into a LLVM AST
 -}
@@ -66,8 +88,6 @@ fromExprsToLLVM xpr@(Var name _) = do
                                 case variables Map.!? name of
                                     Just v  -> pure v
                                     Nothing -> error "Undefined variable."
-                                -- where
-                                --     variables = ask 
 -- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
 fromExprsToLLVM expr    = error "Invalid"
 
