@@ -304,6 +304,25 @@ parseWhileBody tab tokens = case parseBody tab tokens of
     Just (x, Word "do":xs) -> case parseBody tab xs of
         Just (y, yz)    -> Just (While x y (getTypefromExpr x), yz)
 
+parseAPrototypeBody :: [(String, ExprType)] ->  Parser Expr
+parseAPrototypeBody tab tok = case parseExpr tok of
+    Just ((Var n _), TokenType:xs) -> case parseValue xs of
+        Just (y, ys) -> Just (Var n (getTypeFromTypeName y), ys)
+    Just ((Var n _), xs) -> Just (Var n (findExprType tab n), xs)
+    Just (x, xs) -> Just (x, xs)
+
+parsePrototypeBody :: [(String, ExprType)] -> [Expr] ->  Parser [Expr]
+parsePrototypeBody mem tab toks@(TokenOpen:(TokenClose:ys)) = Just ([], ys)
+parsePrototypeBody mem tab (TokenOpen:xs)   =  case parseAPrototypeBody mem xs of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks)                       -> parsePrototypeBody mem (tab ++ [expr]) toks
+    _                                       -> Nothing
+parsePrototypeBody mem tab tokens           = case parseAPrototypeBody mem tokens of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks)                       -> parsePrototypeBody mem (tab ++ [expr]) toks
+    _                                       -> Nothing  
+    
+
 {-
 Launch the expression's parsing instance
 -}
