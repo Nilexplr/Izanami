@@ -51,7 +51,7 @@ runKoak isPrompt content = do
                                 writeFile "temp.bs" ""
                                 let env = JITEnv ctx compLayer mdlKey
                                 ast <- runReaderT (buildModuleT "main" (compileKoak (createAst (stringToToken content)))) env
-                                system "llc temp.bs && gcc -c temp.bs.s -o file.o && gcc file.o main.o -o a.out && rm -f temp.bs temp.bs.s file.o || echo ERROR"
+                                system "llc temp.bs && gcc -c -g3 temp.bs.s -o file.o && gcc file.o main.o -o a.out || rm -f temp.bs temp.bs.s file.o || echo ERROR"
                                 return ()
 
 symResolver :: MangledSymbol -> IO (Either JITSymbolError JITSymbol)
@@ -66,7 +66,7 @@ compileKoak (Ast astXpr@(x@(Extern _ _ _):[]) _)            = appendCompileFile 
 compileKoak (Ast astXpr@(x@(Extern _ _ _):xs) atype)        = do
     appendCompileFile x
     compileKoak (Ast xs atype)
-compileKoak (Ast astXpr@(x:[]) atype)                       = appendCompileFile (Ast astXpr (getTypefromExpr x))
+compileKoak (Ast astXpr@(x:xs) atype)                       = appendCompileFile (Ast astXpr (getTypefromExpr x))
 
 
 appendCompileFile :: Expr -> ModuleBuilderT (ReaderT JITEnv IO) ()

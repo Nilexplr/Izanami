@@ -126,7 +126,7 @@ parseAssign name tokens = case parseExpr tokens of
     Just (x, tokens)    -> Just (Assign (setTypeExpr name (getTypefromExpr x)) x (getTypefromExpr x), tokens)
 
 parseAPrototype :: Parser Expr
-parseAPrototype tok = case parseValue tok of
+parseAPrototype tok = case parseExpr tok of
     Just ((Var n _), TokenType:xs) -> case parseValue xs of
         Just (y, ys) -> Just (Var n (getTypeFromTypeName y), ys)
     Just (x, xs) -> Just (x, xs)
@@ -158,13 +158,14 @@ parseDef :: Parser Expr
 parseDef tokens = case parseValue tokens of
     Just ((Var name _), xs) -> case parsePrototype [] xs of
         Just (proto, (TokenType:ys)) -> case parseValue ys of
-            Just (x, rest) -> case parseExpr rest of
+            Just (x, rest) -> case parseBody ((specialTypeArgument proto) ++ [(name, (getTypeFromTypeName x))]) rest of
                 Just (z, zs) -> Just (Function name proto z (getTypeFromTypeName x), zs)
 
 
 parseCall :: String -> Parser Expr
 parseCall name toks = case parseArgs [] toks of
-    Just (xprs, rest)   -> Just (Call name xprs None, rest) 
+    Just (xprs, rest)   -> Just (Call name xprs None, rest)
+    _                   -> error (show toks)
 
 parseExtern :: Parser Expr
 parseExtern toks = case parseValue toks of
@@ -202,8 +203,8 @@ parseExpr token = case parseValue token of
     Just (x , (TokenOp op:xs))              -> parseBinOp x op xs
     Just (x , (TokenAssign:xs))             -> parseAssign x xs
     Just ((Var x _), tokz@(TokenOpen:xs))   -> parseCall x xs
-    Just (x, tokz@(TokenType:xs))           -> case parseExpr xs of
-        Just (y, rest)  -> Just (List x y None, rest)
+    -- Just (x, tokz@(TokenType:xs))           -> case parseExpr xs of
+    --     Just (y, rest)  -> Just (List x y None, rest)
     Just (x , toks)                         -> Just (x, toks)
 
 {-
@@ -217,7 +218,9 @@ parseExprs list tokens =
     Just (expr, toks@(TokenComa : []))      -> Just (list ++ [expr], [])
     -- Expr still left to parse
     Just (expr, toks@(TokenComa : xs))      -> parseExprs (list ++ [expr]) xs
-    -- Error during the parsing    
+    -- Error during the parsing
+    -- Just (x, tokz@(TokenType:xs))           -> case parseExpr xs of
+    --     Just (y, rest)  -> Just (List x y None, rest)    
     _                                       -> Nothing
 
 findExprType :: [(String, ExprType)] -> String -> ExprType
@@ -225,11 +228,79 @@ findExprType a s = case find (\(k, _) -> s == s) (reverse a) of
     Just (_, e) -> e
     Nothing -> None 
 
+specialTypeArgument :: [Expr] -> [(String, ExprType)]
+specialTypeArgument [] =  []
+specialTypeArgument (expr@(Var name xtype):xs)  = (name, xtype) : specialTypeArgument  xs
+specialTypeArgument _ = error "Bad call of the specialTypeArgument function"
+
 specialTypeCall :: [(String, ExprType)] -> [Expr] -> [Expr]
 specialTypeCall tab (expr@(Function name _ _ xtype):xs) = expr : specialTypeCall (tab ++ [(name, xtype)]) xs
 specialTypeCall tab (expr@(Call name _  _):xs) = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
 specialTypeCall tab (x:xs)  = x : specialTypeCall tab xs
 specialTypeCall tab []  = []
+
+parseBody :: [(String, ExprType)] -> Parser Expr
+parseBody tab token = case parseValueBody tab token of
+    Just (x , (TokenOp op:xs))              -> parseBinOpBody tab x op xs
+    -- Just (x , (TokenType:xs))               -> parseBinOpBody tab x op xs
+    Just (x , (TokenAssign:xs))             -> parseAssign x xs
+    Just ((Var x _), tokz@(TokenOpen:xs))   -> parseCallBody tab x xs
+    Just ((Var x _), xs)                    -> Just (Var x (findExprType tab x), xs)
+    -- Just (x, tokz@(TokenType:xs))           -> case parseExpr xs of
+    --     Just (y, rest)  -> Just (List x y None, rest)
+    Just (x , toks)                         -> Just (x, toks)
+
+parseBinOpBody :: [(String, ExprType)] -> Expr -> Op -> Parser Expr
+parseBinOpBody tab previousExpr op tokens = case parseBody tab tokens of
+    Just (x, toks)      -> Just (BinOp op previousExpr x (getTypefromExpr x), toks)  
+    _                   -> Nothing
+
+parseCallBody :: [(String, ExprType)] -> String -> Parser Expr
+parseCallBody tab name toks = case parseArgs [] toks of
+    Just (xprs, rest)   -> Just (Call name xprs (findExprType tab name), rest)
+    _                   -> error (show toks)
+
+
+parseValueBody :: [(String, ExprType)] -> Parser Expr
+parseValueBody tab (Value x:xs)         = Just ((Val x (typeValueToExpr x)), xs)
+parseValueBody tab (TokenOpen : xs)     = case parseBody tab xs of
+    Just (expr, (TokenClose : ys))  -> Just (expr, ys)
+    Nothing                         -> error "Parse Value return nothing when token open is detected"
+parseValueBody tab (TokenOp op: xs)     = parseUnOp op xs
+--
+parseValueBody tab (Word n:xs)  | n == "for"    = parseForBody tab xs
+                                | n == "if"     = parseIfBody tab xs
+                                | n == "while"  = parseWhileBody tab xs
+                                | otherwise     = Just ((Var n None), xs)
+            --
+-- Error for parsing the value
+parseValueBody tab x = error ("Token not recognize" ++ (show x))
+
+parseForBody :: [(String, ExprType)] -> Parser Expr
+parseForBody tab tokens = case parseBody tab tokens of
+    Just (x, TokenSep:xs)   -> case parseBody tab xs of
+        Just (y, TokenSep:ys)   -> case parseBody tab ys of
+            Just (z, Word "in":zs)  -> case parseBody tab zs of
+                Just (final, restoks) -> Just (For x y  (Just z) final (getTypefromExpr x), restoks)
+                _                     -> error "Bad in parsing for expr"
+            _                     -> error "Bad third sep parsing for expr"
+        Just (z, Word "in":zs)  -> case parseBody tab zs of
+            Just (final, restoks) -> Just (For x z Nothing final (getTypefromExpr x), restoks)
+        _                     -> error "Bad second sep parsing for expr"
+    _                     -> error "Bad first sep parsing for expr"
+
+parseIfBody :: [(String, ExprType)] -> Parser Expr
+parseIfBody tab tokens = case parseBody tab tokens of 
+    Just (x, Word "then":xs)    ->  case parseBody tab xs of
+        Just (y, Word "else":ys)    -> case parseBody tab ys of
+            Just (z, zs)                -> Just (If x y (Just z) (getTypefromExpr y), zs)
+        Just (y, ys)                -> Just (If x y Nothing (getTypefromExpr y), ys)
+    _                           -> error "Bad If expressions"
+
+parseWhileBody :: [(String, ExprType)] -> Parser Expr
+parseWhileBody tab tokens = case parseBody tab tokens of
+    Just (x, Word "do":xs) -> case parseBody tab xs of
+        Just (y, yz)    -> Just (While x y (getTypefromExpr x), yz)
 
 {-
 Launch the expression's parsing instance

@@ -332,6 +332,8 @@ fromElemToArray x = [x]
 exprTypeToType :: ExprType -> Type
 exprTypeToType ExprInt      = Type.i32
 exprTypeToType ExprDouble   = Type.double
+exprTypeToType _            = error "Error during the type parsing"
+
 
 {-
 |   @exprToFirstClass
