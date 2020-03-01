@@ -39,21 +39,49 @@ import LLVM.CodeModel
 type Binds = Map.Map String Operand
 
 fromASTToLLVM :: Expr -> ModuleBuilder Operand
-fromASTToLLVM (Ast ((Function nameS paramsS@(x:xs) fbody ftype):ys) _) = do
+fromASTToLLVM (Function nameS paramsS fbody ftype) = do
     let name = fromString nameS
     case ftype of
         ExprDouble  -> function name params Type.double $ \ops -> do
             let variables = Map.fromList (zip (varToString <$> paramsS) ops)
-            flip runReaderT variables $ fromExprsToLLVM fbody >>= ret
+            flip runReaderT variables $ fromExprsToLLVM [fbody] >>= ret
         ExprInt     -> function name params Type.i32 $ \ops -> do
             let variables = Map.fromList (zip (varToString <$> paramsS) ops)
-            flip runReaderT variables $ fromExprsToLLVM fbody >>= ret
+            flip runReaderT variables $ fromExprsToLLVM [fbody] >>= ret
         where params = createParam <$> paramsS
 
--- buildAST (Extern (Prototype nameStr params)) =
---   extern (fromString nameStr) (replicate (length params) Type.double) Type.double
-fromASTToLLVM (Ast (x:xs) xtype) = function "__anon_expr" [] Type.double $
+
+fromASTToLLVM (Ast ((Function nameS paramsS fbody ftype):[]) ty) = do
+    let name = fromString nameS
+    case ftype of
+        ExprDouble  -> function name params Type.double $ \ops -> do
+            let variables = Map.fromList (zip (varToString <$> paramsS) ops)
+            flip runReaderT variables $ fromExprsToLLVM [fbody] >>= ret
+        ExprInt     -> function name params Type.i32 $ \ops -> do
+            let variables = Map.fromList (zip (varToString <$> paramsS) ops)
+            flip runReaderT variables $ fromExprsToLLVM [fbody] >>= ret
+        where params = createParam <$> paramsS
+
+fromASTToLLVM (Ast ((Function nameS paramsS fbody ftype):rest@(x:xs)) ty) = do
+    let name = fromString nameS
+    case ftype of
+        ExprDouble  -> function name params Type.double $ \ops -> do
+            let variables = Map.fromList (zip (varToString <$> paramsS) ops)
+            flip runReaderT variables $ fromExprsToLLVM [fbody] >>= ret
+        ExprInt     -> function name params Type.i32 $ \ops -> do
+            let variables = Map.fromList (zip (varToString <$> paramsS) ops)
+            flip runReaderT variables $ fromExprsToLLVM [fbody] >>= ret
+    fromASTToLLVM (Ast rest (getTypefromExpr x))
+        where params = createParam <$> paramsS
+
+fromASTToLLVM (Extern name params etype) = extern (fromString name) (exprTypeToType <$> (getTypefromExpr <$> params)) (exprTypeToType etype)
+fromASTToLLVM (Ast x xtype) = function "__anon_expr" [] ty $
     const $ flip runReaderT mempty $ fromExprsToLLVM x >>= ret
+        where
+            ty  | xtype == ExprDouble   = Type.double
+                | xtype == ExprInt      = Type.i32
+                | xtype == None         = Type.i32
+                | otherwise             = error ("Invalid Ast type " ++ (show xtype))
 
 {-
 |   @varToString
@@ -77,17 +105,33 @@ createParam _   = error "Invalid parrameter"
 |   @fromExprsToLLVM
 |   transform an Expr into a LLVM AST
 -}
-fromExprsToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
-fromExprsToLLVM xpr@(BinOp _ _ _ _)         = fromBinOpToLLVM xpr
-fromExprsToLLVM xpr@(Val _ xtype)           = fromValToLLVM xpr xtype
-fromExprsToLLVM xpr@(Call _ _ _)            = fromCallToLLVM xpr
-fromExprsToLLVM xpr@(Var name _)            = do
-                                            variables <- ask
-                                            case variables Map.!? name of
-                                                Just v  -> pure v
-                                                Nothing -> error "Undefined variable."
+fromExprsToLLVM :: [Expr] -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromExprsToLLVM (xpr@(BinOp _ _ _ _):[])    = fromBinOpToLLVM xpr
+fromExprsToLLVM (xpr@(Val _ xtype):[])      = fromValToLLVM xpr xtype
+fromExprsToLLVM (xpr@(Call _ _ _):[])       = fromCallToLLVM xpr
+fromExprsToLLVM (xpr@(Var name _):[])       = do
+                                        variables <- ask
+                                        case variables Map.!? name of
+                                            Just v  -> pure v
+                                            Nothing -> error "Undefined variable."
+fromExprsToLLVM (xpr@(BinOp _ _ _ _):xs)    = do
+                                        fromBinOpToLLVM xpr
+                                        fromExprsToLLVM xs
+fromExprsToLLVM (xpr@(Val _ xtype):xs)      = do
+                                        fromValToLLVM xpr xtype
+                                        fromExprsToLLVM xs
+fromExprsToLLVM (xpr@(Call _ _ _):xs)       = do
+                                        fromCallToLLVM xpr
+                                        fromExprsToLLVM xs
+fromExprsToLLVM (xpr@(Var name _):xs)       = do
+                                        variables <- ask
+                                        case variables Map.!? name of
+                                            Just v  -> pure v
+                                            Nothing -> error "Undefined variable."
+                                        fromExprsToLLVM xs
+
 -- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
-fromExprsToLLVM expr    = error "Invalid"
+fromExprsToLLVM expr    = error ("Invalid expr " ++ (show expr))
 
 {-
 |   @fromCallToLLVM
@@ -95,13 +139,20 @@ fromExprsToLLVM expr    = error "Invalid"
 -}
 fromCallToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromCallToLLVM (Call name paramsExpr ctype) = do
-                                            params <- mapM fromExprsToLLVM paramsExpr
+                                            params <- mapM fromExprsToLLVM (fromElemToArray <$> paramsExpr)
                                             let funcName    = fromString name
-                                                ty          = FunctionType Type.double (exprTypeToType <$> (getTypefromExpr <$> paramsExpr)) False
+                                                ty          = FunctionType Type.i32 (exprTypeToType <$> (getTypefromExpr <$> paramsExpr)) False
                                                 ptrTy       = Type.PointerType ty (AddrSpace 0)
                                                 ref         = GlobalReference ptrTy funcName
                                             call (ConstantOperand ref) (zip params (repeat []))
 fromCallToLLVM xpr = error ("Bad call : " ++ show xpr)
+
+{-
+|   @fromElemToArray
+|   rturn elem into a array (for <$> purpose only)
+-}
+fromElemToArray :: a -> [a]
+fromElemToArray x = [x]
 
 {-
 |   @exprTypeToType
@@ -205,4 +256,4 @@ fromValToLLVM (Val vx vtype) ExprInt        | vtype == ExprInt      = pure $ Con
                                                                             xi = case vx of
                                                                                 ValueInt y -> y
                                                                                 _ -> error "Incompatible type"
-fromValToLLVM x _ = fromExprsToLLVM x
+fromValToLLVM x _ = fromExprsToLLVM [x]
