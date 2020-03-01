@@ -314,7 +314,7 @@ fromCallToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromCallToLLVM (Call name paramsExpr ctype) = do
                                             params <- mapM fromExprsToLLVM (fromElemToArray <$> paramsExpr)
                                             let funcName    = fromString name
-                                                ty          = FunctionType Type.i32 (exprTypeToType <$> (getTypefromExpr <$> paramsExpr)) False
+                                                ty          = FunctionType (exprTypeToType ctype) (exprTypeToType <$> (getTypefromExpr <$> paramsExpr)) False
                                                 ptrTy       = Type.PointerType ty (AddrSpace 0)
                                                 ref         = GlobalReference ptrTy funcName
                                             call (ConstantOperand ref) (zip params (repeat []))
