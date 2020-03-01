@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo       #-}
 
 module LLVMtools where
 
@@ -40,7 +41,145 @@ import Numeric
 
 type Binds = Map.Map String Operand
 
+fromWhileToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromWhileToLLVM (While cond body ExprDouble) = mdo 
+    preheaderB <- block `named` "preheader"
+    initCondV <- (fromExprsToLLVM cond >>= fcmp ONE zero) `named` "initcond"
+    condBr initCondV loopB afterB
+    loopB <- block `named` "loop"
+    -- build the body expression with 'i' in the bindings
+    fromExprsToLLVM body `named` "body"
+    -- default to 1 if there's no step defined
+    let zero = ConstantOperand (Float (Double 0))
+    -- again we need 'i' in the bindings
+    condV <- (fromExprsToLLVM cond >>= fcmp ONE zero) `named` "cond"
+    condBr condV loopB afterB
+    afterB <- block `named` "after"
+    -- since a for loop doesn't really have a value, return 0
+    return $ ConstantOperand (Float (Double 0))
+--
+fromWhileToLLVM (While cond body ExprInt) = mdo 
+    preheaderB <- block `named` "preheader"
+    let init = case cond of 
+            Val (ValueInt n) _  -> (icmp Sicmp.NE zero ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n)))
+            _                   -> (fromExprsToLLVM cond >>= icmp Sicmp.NE zero)
+    initCondV <- init `named` "initcond"
+    condBr initCondV loopB afterB
+    loopB <- block `named` "loop"
+    -- build the body expression with 'i' in the bindings
+    fromExprsToLLVM body `named` "body"
+    -- default to 1 if there's no step defined
+    let zero = ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))
+    -- again we need 'i' in the bindings
+    condV <- (fromExprsToLLVM cond >>= icmp Sicmp.NE zero) `named` "cond"
+    condBr condV loopB afterB
+    afterB <- block `named` "after"
+    -- since a for loop doesn't really have a value, return 0
+    return $ ConstantOperand (Int (fromInteger (fromIntegral 32)) (fromIntegral 0))
 
+fromForToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromForToLLVM (For (Assign (Var name nameType) expr ExprInt) cond step body xtype) = mdo
+    preheaderB <- block `named` "preheader"
+    initV <- fromExprsToLLVM expr `named` "init"
+    -- build the condition expression with 'i' in the bindings
+    initCondV <- withReaderT (Map.insert name initV) $
+                    (fromExprsToLLVM cond >>= icmp Sicmp.NE zero) `named` "initcond"
+
+    -- skip the loop if we don't meet the condition with the init
+    condBr initCondV loopB afterB
+    loopB <- block `named` "loop"
+
+    i <- phi [(initV, preheaderB), (nextVar, loopB)] `named` "i"
+
+    withReaderT (Map.insert name i) $ fromExprsToLLVM body `named` "body"
+
+    stepV <- case step of
+        Just steps -> fromExprsToLLVM steps
+        Nothing -> return $ ConstantOperand (Int (fromInteger (fromIntegral 32)) (fromIntegral 1))
+    nextVar <- add i stepV `named` "nextvar"
+    let zero = ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))
+
+    condV <- withReaderT (Map.insert name i) $
+                (fromExprsToLLVM cond >>= icmp Sicmp.NE zero) `named` "cond"
+    condBr condV loopB afterB
+
+    afterB <- block `named` "after"
+
+    return $ ConstantOperand (Int (fromInteger (fromIntegral 32)) (fromIntegral 0))
+
+
+--
+fromForToLLVM (For (Assign (Var name nameType) expr ExprDouble) cond step body xtype) = mdo
+    preheaderB <- block `named` "preheader"
+    initV <- fromExprsToLLVM expr `named` "init"
+
+    -- build the condition expression with 'i' in the bindings
+    initCondV <- withReaderT (Map.insert name initV) $
+                  (fromExprsToLLVM cond >>= fcmp ONE zero) `named` "initcond"
+    
+    -- skip the loop if we don't meet the condition with the init
+    condBr initCondV loopB afterB
+    loopB <- block `named` "loop"
+    
+    i <- phi [(initV, preheaderB), (nextVar, loopB)] `named` "i"
+    
+    -- build the body expression with 'i' in the bindings
+    withReaderT (Map.insert name i) $ fromExprsToLLVM body `named` "body"
+    
+    -- default to 1 if there's no step defined
+    stepV <- case step of
+      Just steps -> fromExprsToLLVM steps
+      Nothing -> return $ ConstantOperand (Float (Double 1))
+    nextVar <- fadd i stepV `named` "nextvar"
+    
+    let zero = ConstantOperand (Float (Double 0))
+    -- again we need 'i' in the bindings
+    condV <- withReaderT (Map.insert name i) $
+              (fromExprsToLLVM cond >>= fcmp ONE zero) `named` "cond"
+    condBr condV loopB afterB
+    
+    afterB <- block `named` "after"
+
+    -- since a for loop doesn't really have a value, return 0
+    return $ ConstantOperand (Float (Double 0))
+
+
+fromIfToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+fromIfToLLVM (If cond thenexpr (Just elsexpr) xtype)= mdo
+    ifB <- block `named` "if"
+
+    let zero = ConstantOperand (Float (Double 0))
+    condV <- fromExprsToLLVM cond
+    cmp <- fcmp ONE zero condV `named` "cmp"
+
+    condBr cmp thenB elseB
+
+    thenB <- block `named` "then"
+    thenOp <- fromExprsToLLVM thenexpr
+    br mergeB   
+
+    elseB <- block `named` "else"
+    elseOp <- fromExprsToLLVM elsexpr
+    br mergeB   
+
+    mergeB <- block `named` "ifcont"
+    phi [(thenOp, thenB), (elseOp, elseB)]
+--
+fromIfToLLVM (If cond thenexpr Nothing xtype)= mdo
+    ifB <- block `named` "if"
+
+    let zero = ConstantOperand (Float (Double 0))
+    condV <- fromExprsToLLVM cond
+    cmp <- fcmp ONE zero condV `named` "cmp"
+
+    condBr cmp thenB mergeB
+
+    thenB <- block `named` "then"
+    thenOp <- fromExprsToLLVM thenexpr
+    br mergeB      
+
+    mergeB <- block `named` "ifcont"
+    phi [(thenOp, thenB)]
 
 fromASTToLLVM :: Expr -> ModuleBuilder Operand
 -- fromASTToLLVM (Function nameS paramsS@(x:xs) body type) = do
@@ -74,27 +213,10 @@ fromExprsToLLVM xpr@(Var name _) = do
                                 --     variables = ask 
 -- fromExprsToLLVM xpr@(Assign _ xp xtype)     = 
 --
-fromExprsToLLVM expr@(If cond thenexpr elsexpr xtype) = mdo
-    ifB <- block `named` "if"
-
-    let zero = ConstantOperand (Float (Double 0))
-    condV <- fromExprsToLLVM cond
-    cmp <- fcmp ONE zero condV `named` "cmp"
-
-    condBr cmp thenB elseB
-
-    thenB <- block `named` "then"
-    thenOp <- fromExprsToLLVM thenexpr
-    br mergeB   
-
-    elseB <- block `named` "else"
-    elseOp <- fromExprsToLLVM elsexpr
-    br mergeB   
-
-    mergeB <- block `named` "ifcont"
-    phi [(thenOp, thenB), (elseOp, elseB)]
-
-fromExprsToLLVM expr    = error "Invalid"
+fromExprsToLLVM expr@(If _ _ _ _)           = fromIfToLLVM expr
+fromExprsToLLVM expr@(For _ _ _ _ _)        = fromForToLLVM expr
+fromExprsToLLVM expr@(While _ _ _)          = fromWhileToLLVM expr
+fromExprsToLLVM expr    = error ("Invalid" ++ show expr)
 
 {-
 |   @fromAssignToLLVM
@@ -110,8 +232,14 @@ fromBinOpToLLVM (BinOp op xp1 xp2 xtype)   = do
     op1 <- fromValToLLVM xp1 xtype
     op2 <- fromValToLLVM xp2 xtype
     tmp <- instr op1 op2
-    return tmp
+    if isCmp && (xtype == ExprDouble) then uitofp tmp Type.double  else return tmp
         where
+            isCmp
+                | op == Inf = True
+                | op == Sup = True
+                | op == Eq  = True
+                | op == Dif = True
+                | otherwise = False
             instr = case op of
                 Plus    -> case xtype of
                                     ExprInt     -> add

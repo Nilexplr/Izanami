@@ -70,7 +70,7 @@ typeValueToExpr (ValueInt    x) = ExprInt
 getTypefromExpr :: Expr -> ExprType
 getTypefromExpr (Var       _        exprtype)   = exprtype 
 getTypefromExpr (Val       _        exprtype)   = exprtype 
-getTypefromExpr (UnaryOp   Not _    exprtype)   = ExprBool 
+getTypefromExpr (UnaryOp   Not _    exprtype)   = exprtype 
 getTypefromExpr (UnaryOp   op _     exprtype)   = exprtype
 getTypefromExpr (Call      _ _      exprtype)   = exprtype 
 getTypefromExpr (While     _ _      exprtype)   = exprtype 
@@ -131,6 +131,7 @@ parseAPrototype tok = case parseValue tok of
     Just (x, xs) -> Just (x, xs)
 
 parsePrototype :: [Expr] ->  Parser [Expr]
+parsePrototype tab toks@(TokenOpen:(TokenClose:ys)) = Just ([], ys)
 parsePrototype tab (TokenOpen:xs)   =  case parseAPrototype xs of
     Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
     Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) toks
@@ -156,7 +157,8 @@ parseCall name toks = case parsePrototype [] toks of
 parseExtern :: Parser Expr
 parseExtern toks = case parseValue toks of
     Just ((Var name _), xs) -> case parsePrototype [] xs of
-        Just (xprs, rest)   -> Just (Extern name xprs None, rest) 
+        Just (xprs, (TokenType:ys)) -> case parseValue ys of
+            Just (x, rest) -> Just (Extern name xprs (getTypeFromTypeName x), rest) 
                 
 {-
 Parse an expresion value
