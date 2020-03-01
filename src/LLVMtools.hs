@@ -41,6 +41,11 @@ import Numeric
 
 type Binds = Map.Map String Operand
 
+-- fromAssignToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
+-- fromAssignToLLVM (Assign (Var name nameType) body xtype) = do
+--     Map.insert name (fromExprsToLLVM body `named` "var")
+--     return $ ConstantOperand (Int (fromInteger (fromIntegral 32)) (fromIntegral 0))
+
 fromWhileToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromWhileToLLVM (While cond body ExprDouble) = mdo 
     preheaderB <- block `named` "preheader"
@@ -71,7 +76,10 @@ fromWhileToLLVM (While cond body ExprInt) = mdo
     -- default to 1 if there's no step defined
     let zero = ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))
     -- again we need 'i' in the bindings
-    condV <- (fromExprsToLLVM [cond] >>= icmp Sicmp.NE zero) `named` "cond"
+    let checkCond = case cond of 
+            Val (ValueInt n) _  -> (icmp Sicmp.NE zero (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n))))
+            _                   -> (fromExprsToLLVM [cond] >>= icmp Sicmp.NE zero)
+    condV <- checkCond `named` "cond"
     condBr condV loopB afterB
     afterB <- block `named` "after"
     -- since a for loop doesn't really have a value, return 0
@@ -148,10 +156,12 @@ fromIfToLLVM :: Expr -> ReaderT Binds (IRBuilderT ModuleBuilder) Operand
 fromIfToLLVM (If cond thenexpr (Just elsexpr) xtype)= mdo
     ifB <- block `named` "if"
 
-    let zero = ConstantOperand (Float (Double 0))
-    condV <- fromExprsToLLVM [cond]
-    cmp <- fcmp ONE zero condV `named` "cmp"
-
+    let condV = if xtype == ExprDouble then (fromExprsToLLVM [cond] >>= fcmp ONE (ConstantOperand (Float (Double 0)))) 
+                    else case cond of 
+                        Val (ValueInt n) _  -> (icmp Sicmp.NE (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))) (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n))))
+                        _                   -> (fromExprsToLLVM [cond] >>= icmp Sicmp.NE (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral 0))))
+    
+    cmp <- condV `named` "cmp"
     condBr cmp thenB elseB
 
     thenB <- block `named` "then"
