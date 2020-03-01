@@ -141,6 +141,17 @@ parsePrototype tab tokens           = case parseAPrototype tokens of
     Just (expr, toks)                       -> parsePrototype (tab ++ [expr]) toks
     _                                       -> Nothing  
 
+parseArgs :: [Expr] ->  Parser [Expr]
+parseArgs tab toks@(TokenOpen:(TokenClose:ys)) = Just ([], ys)
+parseArgs tab (TokenOpen:xs)   =  case parseAPrototype xs of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks@(TokenSep: ys))        -> parseArgs (tab ++ [expr]) ys
+    _                                       -> Nothing
+parseArgs tab tokens           = case parseAPrototype tokens of
+    Just (expr, toks@(TokenClose: ys))      -> Just (tab ++ [expr], ys)
+    Just (expr, toks@(TokenSep: ys))        -> parseArgs (tab ++ [expr]) ys
+    _                                       -> Nothing  
+
 
 parseDef :: Parser Expr
 parseDef tokens = case parseValue tokens of
@@ -151,7 +162,7 @@ parseDef tokens = case parseValue tokens of
 
 
 parseCall :: String -> Parser Expr
-parseCall name toks = case parsePrototype [] toks of
+parseCall name toks = case parseArgs [] toks of
     Just (xprs, rest)   -> Just (Call name xprs None, rest) 
 
 parseExtern :: Parser Expr
