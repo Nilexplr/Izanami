@@ -10,6 +10,7 @@ module Parser
 
 import Tokenize
 import Data.Data
+import Data.List
 
 type Parser a = [Token] -> Maybe(a, [Token])
 
@@ -219,6 +220,16 @@ parseExprs list tokens =
     -- Error during the parsing    
     _                                       -> Nothing
 
+findExprType :: [(String, ExprType)] -> String -> ExprType
+findExprType a s = case find (\(k, _) -> s == s) (reverse a) of
+    Just (_, e) -> e
+    Nothing -> None 
+
+specialTypeCall :: [(String, ExprType)] -> [Expr] -> [Expr]
+specialTypeCall tab (expr@(Function name _ _ xtype):xs) = expr : specialTypeCall (tab ++ [(name, xtype)]) xs
+specialTypeCall tab (expr@(Call name _  _):xs) = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
+specialTypeCall tab (x:xs)  = x : specialTypeCall tab xs
+specialTypeCall tab []  = []
 
 {-
 Launch the expression's parsing instance
@@ -226,5 +237,5 @@ Launch the expression's parsing instance
 createAst :: [Token] -> Expr
 createAst [] = Ast [] None
 createAst tokens = case parseExprs [] tokens of
-    Just (result, [])   -> Ast result None
+    Just (result, [])   -> Ast (specialTypeCall [] result) None
     _                   -> error "bad parsing"
