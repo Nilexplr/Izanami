@@ -61,7 +61,7 @@ fromWhileToLLVM (While cond body ExprDouble) = mdo
 fromWhileToLLVM (While cond body ExprInt) = mdo 
     preheaderB <- block `named` "preheader"
     let init = case cond of 
-            Val (ValueInt n) _  -> (icmp Sicmp.NE zero ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n)))
+            Val (ValueInt n) _  -> (icmp Sicmp.NE zero (ConstantOperand (Int (fromInteger (fromIntegral 1)) (fromIntegral n))))
             _                   -> (fromExprsToLLVM cond >>= icmp Sicmp.NE zero)
     initCondV <- init `named` "initcond"
     condBr initCondV loopB afterB
