@@ -202,7 +202,7 @@ parseValue x = error ("Token not recognize" ++ (show x))
 
 parseBinOp :: Expr -> Op -> Parser Expr
 parseBinOp previousExpr op tokens = case parseExpr tokens of
-    Just (x, toks)      -> Just (BinOp op previousExpr x ExprInt, toks)  
+    Just (x, toks)      -> Just (BinOp op previousExpr x (getTypefromExpr x), toks)  
     _                   -> Nothing
 
 parseExpr :: Parser Expr
@@ -235,13 +235,18 @@ findExprType a s = case find (\(k, _) -> s == s) (a) of
     Just (_, e) -> e
     Nothing -> None 
 
+-- putArgIntoScoop :: [(String, ExprType)] -> [Expr] -> [(String, ExprType)]
+-- putArgIntoScoop tab [] = tab
+-- putArgIntoScoop tab ((Var name xtype):xs) = 
+
+
 specialTypeArgument :: [Expr] -> [(String, ExprType)]
 specialTypeArgument [] =  []
 specialTypeArgument (expr@(Var name xtype):xs)  = (name, xtype) : specialTypeArgument  xs
 specialTypeArgument _ = error "Bad call of the specialTypeArgument function"
 
 specialTypeCall :: [(String, ExprType)] -> [Expr] -> [Expr]
-specialTypeCall tab (expr@(Function name param body xtype):xs)  = expr : specialTypeCall (tab ++ [(name, xtype)]) xs
+specialTypeCall tab (expr@(Function name param body xtype):xs)  = expr : specialTypeCall (tab ++ [(name, xtype)]) xs --(Function name param (head (specialTypeCall (tab ++ (specialTypeArgument param)) [body])) xtype) : specialTypeCall (tab ++ [(name, xtype)]) xs
 specialTypeCall tab (expr@(Assign (Var name s) x xtype):xs)     = Assign (Var name None) (head (specialTypeCall tab [x])) xtype: specialTypeCall (tab ++ [(name, xtype)]) xs
 specialTypeCall tab (expr@(Var name xtype):xs)                  = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
 specialTypeCall tab (expr@(Call name x  y):xs)                  = setTypeExpr expr (findExprType tab name) : specialTypeCall tab xs
@@ -266,12 +271,12 @@ parseBody tab token = case parseValueBody tab token of
 
 parseBinOpBody :: [(String, ExprType)] -> Expr -> Op -> Parser Expr
 parseBinOpBody tab previousExpr op tokens = case parseBody tab tokens of
-    Just (x, toks)      -> Just (BinOp op previousExpr x ExprInt, toks)  
+    Just (x, toks)      -> Just (BinOp op previousExpr x (getTypefromExpr x), toks)  
     _                   -> Nothing
 
 parseCallBody :: [(String, ExprType)] -> String -> Parser Expr
 parseCallBody tab name toks = case parseArgs [] toks of
-    Just (xprs, rest)   -> Just (Call name xprs (findExprType tab name), rest)
+    Just (xprs, rest)   -> Just (Call name (specialTypeCall tab xprs) (findExprType tab name), rest)
     _                   -> error (show toks)
 
 
@@ -286,7 +291,7 @@ parseValueBody tab (Word n:xs@(y:ys))   | n == "for"    = parseForBody tab xs
                                         | n == "if"     = parseIfBody tab xs
                                         | n == "while"  = parseWhileBody tab xs
                                         | otherwise     = case y of
-                                        TokenOpen   -> parseCall n ys
+                                        TokenOpen   -> parseCallBody tab n ys
                                         _           -> Just ((Var n None), xs)
             --
 -- Error for parsing the value
