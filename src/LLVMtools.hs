@@ -233,7 +233,6 @@ fromASTToLLVM (Ast x xtype) = function "__anon_expr" [] ty $
         where
             ty  | xtype == ExprDouble   = Type.double
                 | xtype == ExprInt      = Type.i32
-                | xtype == None         = Type.i32
                 | otherwise             = error ("Invalid Ast type " ++ (show xtype))
 
 {-
